@@ -21,6 +21,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.coppersmith.music2.data.repository.PlaybackRepository
+import com.coppersmith.music2.diagnostics.RideLogger
 import android.speech.tts.TextToSpeech
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
@@ -134,6 +135,7 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                 }
 
                 Log.d("MusicPlaybackService", "Metadata updated: title=$title, artist=$artist")
+                RideLogger.log("METADATA_UPDATED title='$title' artist='$artist'")
                 serviceScope.launch {
                     repository.updateMetadata(title, artist)
                 }
@@ -142,6 +144,7 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 val isLoading = playbackState == Player.STATE_BUFFERING
                 Log.d("MusicPlaybackService", "PlaybackState: $playbackState, isLoading: $isLoading")
+                RideLogger.log("PLAYBACK_STATE_CHANGED state=$playbackState isLoading=$isLoading station='${repository.state.value.currentStation?.name}'")
                 serviceScope.launch {
                     repository.setLoading(isLoading)
                     if (playbackState == Player.STATE_ENDED) {
@@ -157,7 +160,7 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 Log.d("MusicPlaybackService", "onIsPlayingChanged: $isPlaying, playWhenReady: ${player.playWhenReady}, state: ${player.playbackState}")
-                // Do not mark isPlaying = false if player is buffering or attempting to play
+                RideLogger.log("IS_PLAYING_CHANGED isPlaying=$isPlaying station='${repository.state.value.currentStation?.name}'")
                 if (isPlaying || !player.playWhenReady) {
                     serviceScope.launch {
                         repository.setPlaying(isPlaying)
@@ -167,9 +170,9 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
 
             override fun onPlayerError(error: PlaybackException) {
                 Log.e("MusicPlaybackService", "ExoPlayer error [${error.errorCodeName}]: ${error.message}", error)
+                RideLogger.log("EXOPLAYER_ERROR code='${error.errorCodeName}' message='${error.message}' station='${repository.state.value.currentStation?.name}'")
                 serviceScope.launch {
                     if (repository.state.value.isPlaying) {
-                        // Automatic retry for live stream dropouts / network shifts / call interruptions
                         delay(1500)
                         player.prepare()
                         player.play()
@@ -191,6 +194,7 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                 @Suppress("DEPRECATION")
                 val keyEvent = intent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
                 if (keyEvent != null && keyEvent.action == KeyEvent.ACTION_DOWN) {
+                    RideLogger.log("BLUETOOTH_MEDIA_BUTTON keyCode=${keyEvent.keyCode}")
                     when (keyEvent.keyCode) {
                         KeyEvent.KEYCODE_MEDIA_NEXT -> {
                             repository.nextStation()
@@ -240,6 +244,7 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                         lastAnnouncedCategoryId = category.id
                         if (state.announceCategories && state.isPlaying && isTtsReady) {
                             Log.d("MusicPlaybackService", "Announcing category name: ${category.name}")
+                            RideLogger.log("TTS_CATEGORY_ANNOUNCEMENT category='${category.name}'")
                             textToSpeech?.speak(category.name, TextToSpeech.QUEUE_FLUSH, null, "cat_announce_${category.id}")
                         }
                     }
@@ -252,6 +257,7 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                     Log.d("MusicPlaybackService", "State update: station=${station.name}, url=${station.streamUrl}, isPlaying=${state.isPlaying}, currentUrl=$currentUrl, isErrorOrIdle=$isErrorOrIdle")
 
                     if (currentUrl != station.streamUrl || isErrorOrIdle) {
+                        RideLogger.log("STATION_CHANGE_INITIATED station='${station.name}' url='${station.streamUrl}' category='${state.currentCategory?.name}'")
                         player.stop()
                         player.clearMediaItems()
 
@@ -293,6 +299,7 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         Log.d("MusicPlaybackService", "App swiped away from recent tasks. Stopping playback.")
+        RideLogger.log("SERVICE_TASK_REMOVED: User swiped app away from recent tasks.")
         serviceScope.launch {
             repository.setPlaying(false)
         }

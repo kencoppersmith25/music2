@@ -6,6 +6,7 @@ import com.coppersmith.music2.data.HardcodedDataSource
 import com.coppersmith.music2.data.model.Category
 import com.coppersmith.music2.data.model.PlayerState
 import com.coppersmith.music2.data.model.Station
+import com.coppersmith.music2.diagnostics.RideLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -227,6 +228,7 @@ object PlaybackRepository {
         }
 
         val cleanSearchTerm = categoryName.substringAfter("Search: ").trim().replaceFirstChar { it.uppercase() }
+        RideLogger.log("SEARCH_STARTED query='$tag' term='$cleanSearchTerm'")
         setLoading(true)
         _state.update { it.copy(searchingCategoryName = cleanSearchTerm, searchError = null) }
         val stations = mutableListOf<Station>()
@@ -340,6 +342,7 @@ object PlaybackRepository {
         }
 
         if (stations.isNotEmpty()) {
+            RideLogger.log("SEARCH_SUCCESS category='$displayName' stationsCount=${stations.size}")
             val newCategory = Category(id = searchCatId, name = displayName, stations = stations)
             withContext(Dispatchers.Main) {
                 val checkIndex = playlist.indexOfFirst {
@@ -362,6 +365,7 @@ object PlaybackRepository {
                 }
             }
         } else {
+            RideLogger.log("SEARCH_NO_RESULTS category='$displayName'")
             withContext(Dispatchers.Main) {
                 _state.update {
                     it.copy(
@@ -502,6 +506,8 @@ object PlaybackRepository {
 
         categoryLastStationMap[safeCatIdx] = safeStatIdx
         val station = category.stations[safeStatIdx]
+
+        RideLogger.log("COMMIT_STATE catIdx=$safeCatIdx statIdx=$safeStatIdx category='${category.name}' station='${station.name}'")
 
         _state.update {
             it.copy(
