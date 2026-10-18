@@ -10,6 +10,9 @@ import com.coppersmith.music2.diagnostics.RideLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -209,6 +212,35 @@ object PlaybackRepository {
         }
     }
 
+    private fun fetchStationsForTerm(baseUrl: String, field: String, term: String, limit: Int): List<Station> {
+        val results = mutableListOf<Station>()
+        try {
+            val encodedTag = URLEncoder.encode(term.trim(), "UTF-8")
+            val url = URL("$baseUrl/json/stations/search?$field=$encodedTag&limit=$limit&hidebroken=true&order=votes&reverse=true")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("User-Agent", "NoHandsRadio/1.1 Android")
+            connection.connectTimeout = 3000
+            connection.readTimeout = 3000
+
+            if (connection.responseCode == 200) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(response)
+                for (i in 0 until jsonArray.length()) {
+                    val obj = jsonArray.getJSONObject(i)
+                    val name = obj.optString("name", "Unknown Station").trim()
+                    val streamUrl = obj.optString("url_resolved", "").ifBlank { obj.optString("url", "") }.trim()
+                    val id = obj.optString("stationuuid", i.toString())
+                    if (streamUrl.isNotEmpty() && !streamUrl.contains("localhost")) {
+                        results.add(Station(id = id, name = name, streamUrl = streamUrl))
+                    }
+                }
+            }
+            connection.disconnect()
+        } catch (_: Exception) {}
+        return results
+    }
+
     suspend fun loadCategoryLive(categoryId: String, categoryName: String, tag: String) = mutex.withLock {
         val displayName = if (categoryName.startsWith("Search:", ignoreCase = true)) categoryName else "Search: ${categoryName.replaceFirstChar { it.uppercase() }}"
         val searchCatId = "cat_search_${tag.lowercase().replace(" ", "_")}"
@@ -245,7 +277,6 @@ object PlaybackRepository {
                 val queryLower = tag.trim().lowercase()
                 val searchTags = mutableListOf(tag)
 
-                // Synergy expansions matching your Music One Chat setup
                 when {
                     queryLower.contains("classical") || queryLower.contains("symphony") || queryLower.contains("orchestra") -> {
                         searchTags.addAll(listOf("Classical", "Symphony", "Orchestra", "Opera", "Chamber", "Baroque", "Philharmonic"))
@@ -262,81 +293,30 @@ object PlaybackRepository {
                 val rawStations = mutableListOf<Station>()
                 val searchLimit = _state.value.searchResultLimit
 
-                for (baseUrl in baseUrls) {
-                    try {
-                        for (t in searchTags) {
-                            val encodedTag = URLEncoder.encode(t, "UTF-8")
-                            val url = URL("$baseUrl/json/stations/search?tag=$encodedTag&limit=$searchLimit&hidebroken=true&order=votes&reverse=true")
-                            val connection = url.openConnection() as HttpURLConnection
-                            connection.requestMethod = "GET"
-                            connection.setRequestProperty("User-Agent", "NoHandsRadio/1.1 Android")
-                            connection.connectTimeout = 4000
-                            connection.readTimeout = 4000
-
-                            if (connection.responseCode == 200) {
-                                val reader = BufferedReader(InputStreamReader(connection.inputStream))
-                                val response = reader.readText()
-                                reader.close()
-
-                                val jsonArray = JSONArray(response)
-                                for (i in 0 until jsonArray.length()) {
-                                    val obj = jsonArray.getJSONObject(i)
-                                    val name = obj.optString("name", "Unknown Station").trim()
-                                    val streamUrl = obj.optString("url_resolved", "").ifBlank { obj.optString("url", "") }.trim()
-                                    val id = obj.optString("stationuuid", i.toString())
-                                    if (streamUrl.isNotEmpty() && !streamUrl.contains("localhost")) {
-                                        rawStations.add(Station(id = id, name = name, streamUrl = streamUrl))
-                                    }
-                                }
-                            }
-                            connection.disconnect()
-                        }
-                        if (rawStations.isNotEmpty()) break
-                    } catch (_: Exception) {
-                        // Try next base URL
-                    }
-                }
-
-                if (rawStations.isEmpty()) {
+                coroutineScope {
                     for (baseUrl in baseUrls) {
                         try {
-                            val encodedTag = URLEncoder.encode(tag.trim(), "UTF-8")
-                            val url = URL("$baseUrl/json/stations/search?name=$encodedTag&limit=$searchLimit&hidebroken=true&order=votes&reverse=true")
-                            val connection = url.openConnection() as HttpURLConnection
-                            connection.requestMethod = "GET"
-                            connection.setRequestProperty("User-Agent", "NoHandsRadio/1.1 Android")
-                            connection.connectTimeout = 4000
-                            connection.readTimeout = 4000
-
-                            if (connection.responseCode == 200) {
-                                val reader = BufferedReader(InputStreamReader(connection.inputStream))
-                                val response = reader.readText()
-                                reader.close()
-
-                                val jsonArray = JSONArray(response)
-                                for (i in 0 until jsonArray.length()) {
-                                    val obj = jsonArray.getJSONObject(i)
-                                    val name = obj.optString("name", "Unknown Station").trim()
-                                    val streamUrl = obj.optString("url_resolved", "").ifBlank { obj.optString("url", "") }.trim()
-                                    val id = obj.optString("stationuuid", i.toString())
-                                    if (streamUrl.isNotEmpty() && !streamUrl.contains("localhost")) {
-                                        rawStations.add(Station(id = id, name = name, streamUrl = streamUrl))
-                                    }
-                                }
+                            val tagJobs = searchTags.map { t ->
+                                async(Dispatchers.IO) { fetchStationsForTerm(baseUrl, "tag", t, searchLimit) }
                             }
-                            connection.disconnect()
+                            val nameJob = async(Dispatchers.IO) { fetchStationsForTerm(baseUrl, "name", tag, searchLimit) }
+
+                            val tagResults = tagJobs.awaitAll().flatten()
+                            val nameResults = nameJob.await()
+
+                            rawStations.addAll(tagResults)
+                            rawStations.addAll(nameResults)
+
                             if (rawStations.isNotEmpty()) break
-                        } catch (_: Exception) {
-                            // Try next base URL
-                        }
+                        } catch (_: Exception) {}
                     }
                 }
 
-                // Deduplicate stations
                 stations.addAll(rawStations.distinctBy { it.streamUrl.lowercase().split('?')[0] }.distinctBy { it.name.lowercase() })
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            RideLogger.log("SEARCH_EXCEPTION query='$tag' error='${e.message}'")
         } finally {
             setLoading(false)
         }
