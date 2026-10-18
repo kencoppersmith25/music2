@@ -3,8 +3,11 @@ package com.coppersmith.music2.service
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.coppersmith.music2.R
 import android.view.KeyEvent
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
@@ -75,11 +78,38 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         }
     }
 
+    private fun promoteToForeground(title: String = "No Hands Radio", text: String = "Live Radio Stream") {
+        try {
+            val pendingIntent = packageManager.getLaunchIntentForPackage(packageName)?.let { intent ->
+                android.app.PendingIntent.getActivity(this, 0, intent, android.app.PendingIntent.FLAG_IMMUTABLE)
+            }
+
+            val notification = NotificationCompat.Builder(this, "media_playback_channel")
+                .setContentTitle(title)
+                .setContentText(text)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setOngoing(true)
+                .setContentIntent(pendingIntent)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .build()
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(1001, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else {
+                startForeground(1001, notification)
+            }
+        } catch (e: Exception) {
+            Log.e("MusicPlaybackService", "Error starting foreground notification: ${e.message}", e)
+        }
+    }
+
     @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
 
         createNotificationChannel()
+        promoteToForeground()
 
         // Initialize Text-To-Speech engine for category announcements
         textToSpeech = TextToSpeech(this, this)
@@ -255,6 +285,10 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                     val isErrorOrIdle = player.playerError != null || player.playbackState == Player.STATE_IDLE
 
                     Log.d("MusicPlaybackService", "State update: station=${station.name}, url=${station.streamUrl}, isPlaying=${state.isPlaying}, currentUrl=$currentUrl, isErrorOrIdle=$isErrorOrIdle")
+
+                    if (state.isPlaying) {
+                        promoteToForeground(station.name, state.currentCategory?.name ?: "Live Radio Stream")
+                    }
 
                     if (currentUrl != station.streamUrl || isErrorOrIdle) {
                         RideLogger.log("STATION_CHANGE_INITIATED station='${station.name}' url='${station.streamUrl}' category='${state.currentCategory?.name}'")
