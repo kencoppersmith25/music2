@@ -1,0 +1,738 @@
+package com.coppersmith.music1chat
+
+// Music1Chat coordinated release
+// File: RadioPlayer.kt
+// Release: 2026-07-25 v04
+// Coordinated with RideLogger diagnostic infrastructure.
+
+import android.content.ComponentName
+import android.content.Context
+import android.net.Uri
+import android.util.Log
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import com.coppersmith.music1chat.models.Station
+import com.coppersmith.music1chat.persistence.AppPreferences
+import com.coppersmith.music1chat.playback.PlaybackService
+import com.coppersmith.music1chat.diagnostics.RideLogger
+import com.coppersmith.music1chat.resolver.ResolutionResult
+import com.coppersmith.music1chat.resolver.StreamResolver
+import com.google.common.util.concurrent.ListenableFuture
+import android.view.HapticFeedbackConstants
+import android.media.AudioManager
+import android.media.ToneGenerator
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+class RadioPlayer(
+    context: Context,
+    private val streamResolver: StreamResolver = StreamResolver()
+) {
+    enum class PlaybackSource {
+        NAVIGATION,
+        SEARCH
+    }
+
+    private data class PlaybackRequest(
+        val generation: Long,
+        val station: Station,
+        val source: PlaybackSource,
+        val mediaId: String
+    )
+
+    private val applicationContext = context.applicationContext
+    private val appPreferences = AppPreferences(applicationContext)
+    private val resolverScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val stationsBeingResolved = mutableSetOf<Long>()
+
+    private var startupWatchdogJob: Job? = null
+    private var stallWatchdogJob: Job? = null
+    private var audioProgressWatchdogJob: Job? = null
+    private val retryEligibilityJobs = mutableMapOf<Long, Job>()
+
+    private var nextGeneration = 0L
+    private var activeRequest: PlaybackRequest? = null
+    private var pendingRequest: PlaybackRequest? = null
+    private var playbackStartTime = 0L
+    private var playbackNavGeneration = 0L
+    private var activeRequestHasPlayed = false
+    private var controller: MediaController? = null
+
+    private var lastObservedPositionMs = -1L
+    private var positionStallCount = 0
+
+    private val controllerFuture: ListenableFuture<MediaController>
+
+    var onStationFailed: ((Station) -> Unit)? = null
+    var onStationResolved: ((Station, ResolutionResult) -> Unit)? = null
+
+    var isPlaying by mutableStateOf(false)
+        private set
+
+    var playbackRequested by mutableStateOf(false)
+        private set
+
+    var connecting by mutableStateOf(false)
+        private set
+
+    var errorMessage by mutableStateOf<String?>(null)
+        private set
+
+    var nowPlayingTitle by mutableStateOf("")
+        private set
+
+    var nowPlayingArtist by mutableStateOf("")
+        private set
+
+    var nowPlayingArtworkUri by mutableStateOf<Uri?>(null)
+        private set
+
+    var nowPlayingText by mutableStateOf("")
+        private set
+
+    enum class FeedbackType {
+        STATION_CHANGE,
+        CATEGORY_CHANGE
+    }
+
+    fun playFeedbackSound(type: FeedbackType = FeedbackType.STATION_CHANGE) {
+        if (!appPreferences.loadSearchIndicatorSoundEnabled()) return
+        
+        try {
+            val toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 60) // Volume reduced from 100 to 60
+            
+            when (type) {
+                FeedbackType.STATION_CHANGE -> {
+                    // Single crisp beep
+                    toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP2, 120)
+                }
+                FeedbackType.CATEGORY_CHANGE -> {
+                    // High-Low double beep for category movement
+                    toneGenerator.startTone(ToneGenerator.TONE_CDMA_PIP, 100)
+                    CoroutineScope(Dispatchers.IO).launch {
+                        delay(120)
+                        toneGenerator.startTone(ToneGenerator.TONE_CDMA_LOW_L, 120)
+                    }
+                }
+            }
+
+            CoroutineScope(Dispatchers.IO).launch {
+                delay(500)
+                toneGenerator.release()
+            }
+        } catch (_: Exception) {}
+    }
+
+    val activeStation: Station?
+        get() = activeRequest?.station
+
+    val activePlaybackSource: PlaybackSource?
+        get() = activeRequest?.source
+
+    init {
+        val sessionToken = SessionToken(
+            applicationContext,
+            ComponentName(
+                applicationContext,
+                PlaybackService::class.java
+            )
+        )
+
+        controllerFuture = MediaController.Builder(
+            applicationContext,
+            sessionToken
+        ).buildAsync()
+
+        controllerFuture.addListener(
+            {
+                try {
+                    val connectedController = controllerFuture.get()
+                    controller = connectedController
+                    connectedController.addListener(playerListener)
+                    isPlaying = connectedController.isPlaying
+
+                    pendingRequest?.let { request ->
+                        if (requestIsStillActive(request)) {
+                            pendingRequest = null
+                            startPlayback(
+                                request = request,
+                                mediaController = connectedController
+                            )
+                        }
+                    }
+                } catch (exception: Exception) {
+                    Log.e("RadioPlayer", "Unable to connect to PlaybackService", exception)
+                    errorMessage = "Unable to connect to the playback service."
+                }
+            },
+            ContextCompat.getMainExecutor(applicationContext)
+        )
+    }
+
+    private val playerListener = object : Player.Listener {
+
+        override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
+            val request = matchingActiveRequest() ?: return
+
+            val title = mediaMetadata.title?.toString()?.trim().orEmpty()
+            val artist = mediaMetadata.artist?.toString()?.trim().orEmpty()
+
+            nowPlayingArtworkUri =
+                mediaMetadata.artworkUri
+                    ?: request.station.logoUrl
+                        .takeIf { it.isNotBlank() }
+                        ?.let(Uri::parse)
+
+            nowPlayingTitle = title.takeUnless {
+                it.equals(request.station.name, ignoreCase = true)
+            }.orEmpty()
+
+            nowPlayingArtist = artist
+            nowPlayingText = formatNowPlayingText(
+                stationName = request.station.name,
+                title = title,
+                artist = artist
+            )
+        }
+
+        override fun onIsPlayingChanged(playing: Boolean) {
+            val request = matchingActiveRequest() ?: return
+
+            isPlaying = playing
+
+            val state = controller?.playbackState
+
+            RideLogger.log(
+                "IS_PLAYING_CHANGED " +
+                        "playing=$playing " +
+                        "state=$state " +
+                        "requested=$playbackRequested"
+            )
+
+            if (playing) {
+                playbackRequested = true
+                connecting = false
+                activeRequestHasPlayed = true
+                cancelStallWatchdog()
+                startAudioProgressWatchdog(request)
+                
+                // RESET GRUDGES: If we play successfully, clear the failure counts.
+                rapidFailureCount = 0 
+                
+                if (request.generation == playbackNavGeneration) {
+                    val elapsed = System.currentTimeMillis() - playbackStartTime
+                    RideLogger.log("STATION_PLAYING station='${request.station.name}' elapsed=$elapsed")
+                }
+
+                cancelStartupWatchdog()
+                errorMessage = null
+                request.station.failedThisSession = false
+                cancelRetryEligibility(request.station)
+            } else if (
+                playbackRequested &&
+                activeRequestHasPlayed &&
+                state == Player.STATE_BUFFERING
+            ) {
+                startStallWatchdog(request)
+            } else if (
+                playbackRequested &&
+                activeRequestHasPlayed &&
+                state == Player.STATE_ENDED
+            ) {
+                // AUTO-ADVANCE ON END: Some streams are files that finish.
+                RideLogger.log("STATION_ENDED station='${request.station.name}'")
+                onStationFailed?.invoke(request.station)
+            }
+        }
+
+        override fun onPlayWhenReadyChanged(
+            playWhenReady: Boolean,
+            reason: Int
+        ) {
+            val request = matchingActiveRequest() ?: return
+
+            playbackRequested = playWhenReady
+
+            RideLogger.log(
+                "PLAYBACK_REQUEST_SYNC " +
+                        "playWhenReady=$playWhenReady " +
+                        "reason=$reason " +
+                        "station='${request.station.name}'"
+            )
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            connecting = false
+            val request = matchingActiveRequest() ?: return
+
+            isPlaying = false
+            cancelStallWatchdog()
+            
+            val failedStation = request.station
+            
+            // LIE DETECTOR: Check if the phone actually has internet
+            val connectivityManager = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = connectivityManager.activeNetwork
+            val capabilities = connectivityManager.getNetworkCapabilities(network)
+            val actuallyHasInternet = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+
+            if (isTemporaryNetworkFailure(error) && !actuallyHasInternet) {
+                // TRULY NO INTERNET - Show waiting message
+                failedStation.failedThisSession = false
+                cancelStartupWatchdog() 
+                
+                errorMessage = "Network lost. Waiting for connection to play ${failedStation.name}…"
+                RideLogger.log("NETWORK_WAIT station='${failedStation.name}' error='${error.errorCodeName}'")
+                return
+            }
+
+            // THE STATION IS LYING OR BROKEN - Advance immediately
+            errorMessage = "Station unavailable. Trying next station."
+            RideLogger.log("STATION_FAILURE_JUMP station='${failedStation.name}' error='${error.errorCodeName}' internet=$actuallyHasInternet")
+
+            failedStation.failedThisSession = true
+            scheduleRetryEligibility(failedStation)
+
+            if (!requestIsStillActive(request)) {
+                return
+            }
+
+            onStationFailed?.invoke(failedStation)
+            resolveFailedStationInBackground(failedStation)
+        }
+    }
+
+    fun play(station: Station) {
+        play(station = station, source = PlaybackSource.NAVIGATION)
+    }
+
+    /**
+     * Smoothly sets the player volume.
+     * Use values between 0.0f (silent) and 1.0f (full volume).
+     */
+    fun setVolume(volume: Float) {
+        controller?.volume = volume.coerceIn(0f, 1f)
+    }
+
+    fun play(station: Station, source: PlaybackSource) {
+        val request = createPlaybackRequest(station = station, source = source)
+        cancelStartupWatchdog()
+        cancelStallWatchdog()
+
+        activeRequest = request
+        pendingRequest = null
+        errorMessage = null
+        nowPlayingTitle = ""
+        nowPlayingArtist = ""
+        nowPlayingArtworkUri = null
+        nowPlayingText = ""
+        isPlaying = false
+        playbackRequested = true
+        connecting = true
+        activeRequestHasPlayed = false
+
+        val connectedController = controller
+        if (connectedController == null) {
+            pendingRequest = request
+            return
+        }
+
+        startPlayback(request = request, mediaController = connectedController)
+    }
+
+    private fun createPlaybackRequest(station: Station, source: PlaybackSource): PlaybackRequest {
+        nextGeneration++
+        val generation = nextGeneration
+        return PlaybackRequest(
+            generation = generation,
+            station = station,
+            source = source,
+            mediaId = buildMediaId(stationId = station.id, generation = generation)
+        )
+    }
+
+    private fun startPlayback(request: PlaybackRequest, mediaController: MediaController) {
+        if (!requestIsStillActive(request)) {
+            return
+        }
+
+        val station = request.station
+        val playbackUrl = preferredPlaybackUrl(station)
+
+        // Build a detailed subtitle for the TV receiver
+        val detailedSubtitle = listOf(station.genre, station.city, station.country)
+            .filter { it.isNotBlank() }
+            .joinToString(" • ")
+
+        val mediaMetadata = MediaMetadata.Builder()
+            .setTitle(station.name)
+            .setSubtitle(detailedSubtitle)
+            .setArtist(station.callLetters)
+            .setGenre(station.genre)
+            .setStation(station.name)
+            .setArtworkUri(
+                if (station.logoUrl.isNotBlank()) {
+                    Uri.parse(station.logoUrl)
+                } else null
+            )
+            .setIsPlayable(true)
+            .build()
+
+        val mediaItem = MediaItem.Builder()
+            .setMediaId(request.mediaId)
+            .setUri(playbackUrl)
+            .setMimeType(inferMimeType(playbackUrl))
+            .setMediaMetadata(mediaMetadata)
+            .build()
+
+        playbackStartTime = System.currentTimeMillis()
+        playbackNavGeneration = request.generation
+
+        mediaController.stop()
+        mediaController.clearMediaItems()
+        mediaController.setMediaItem(mediaItem)
+        mediaController.prepare()
+        mediaController.play()
+
+        startStartupWatchdog(request = request, mediaController = mediaController)
+    }
+
+    private fun startStallWatchdog(request: PlaybackRequest) {
+        if (stallWatchdogJob?.isActive == true) {
+            return
+        }
+
+        cancelAudioProgressWatchdog()
+
+        stallWatchdogJob = resolverScope.launch {
+            delay(STALL_FAILURE_TIMEOUT_MILLISECONDS)
+            withContext(Dispatchers.Main) {
+                val mediaController = controller ?: return@withContext
+
+                if (
+                    !requestIsStillActive(request) ||
+                    !playbackRequested ||
+                    !activeRequestHasPlayed ||
+                    mediaController.isPlaying ||
+                    mediaController.playbackState != Player.STATE_BUFFERING
+                ) {
+                    return@withContext
+                }
+
+                val failedStation = request.station
+
+                RideLogger.log(
+                    "STATION_STALL_FAILED " +
+                            "delayMs=$STALL_FAILURE_TIMEOUT_MILLISECONDS " +
+                            "station='${failedStation.name}' " +
+                            "mediaId='${request.mediaId}' " +
+                            "generation=${request.generation}"
+                )
+
+                mediaController.stop()
+                mediaController.clearMediaItems()
+
+                playbackRequested = false
+                isPlaying = false
+                failedStation.failedThisSession = true
+                scheduleRetryEligibility(failedStation)
+                errorMessage = "${failedStation.name} stalled. Trying the next station."
+
+                if (!requestIsStillActive(request)) {
+                    return@withContext
+                }
+
+                onStationFailed?.invoke(failedStation)
+                resolveFailedStationInBackground(failedStation)
+            }
+        }
+    }
+
+    private fun cancelStallWatchdog() {
+        stallWatchdogJob?.cancel()
+        stallWatchdogJob = null
+    }
+
+    private fun startAudioProgressWatchdog(request: PlaybackRequest) {
+        cancelAudioProgressWatchdog()
+        lastObservedPositionMs = -1L
+        positionStallCount = 0
+
+        audioProgressWatchdogJob = resolverScope.launch {
+            while (requestIsStillActive(request)) {
+                delay(2000L) // Check every 2 seconds
+
+                withContext(Dispatchers.Main) {
+                    val mediaController = controller ?: return@withContext
+                    if (!mediaController.isPlaying || !requestIsStillActive(request)) return@withContext
+
+                    val currentPosition = mediaController.currentPosition
+                    if (currentPosition == lastObservedPositionMs && currentPosition != 0L) {
+                        positionStallCount++
+                    } else {
+                        positionStallCount = 0
+                    }
+                    lastObservedPositionMs = currentPosition
+
+                    if (positionStallCount >= 3) { // 6 seconds of no movement while "playing"
+                        val failedStation = request.station
+                        RideLogger.log("STATION_AUDIO_STALL station='${failedStation.name}' position=$currentPosition")
+                        
+                        mediaController.stop()
+                        mediaController.clearMediaItems()
+                        
+                        failedStation.failedThisSession = true
+                        errorMessage = "${failedStation.name} data stream stalled. Trying next..."
+                        onStationFailed?.invoke(failedStation)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun cancelAudioProgressWatchdog() {
+        audioProgressWatchdogJob?.cancel()
+        audioProgressWatchdogJob = null
+    }
+
+    private var lastFailureTime = 0L
+    private var rapidFailureCount = 0
+
+    private fun startStartupWatchdog(request: PlaybackRequest, mediaController: MediaController) {
+        cancelStartupWatchdog()
+
+        // Read user preference for station startup timeout (default to 8 seconds)
+        val timeoutSeconds = appPreferences.loadStationTimeoutSeconds() // Fallback to 8L if custom key doesn't exist yet
+        val timeoutMillis = (if (timeoutSeconds > 0) timeoutSeconds else 8L) * 1000L
+
+        startupWatchdogJob = resolverScope.launch {
+            delay(timeoutMillis)
+            withContext(Dispatchers.Main) {
+                if (
+                    !requestIsStillActive(request) ||
+                    !playbackRequested ||
+                    isPlaying ||
+                    activeRequestHasPlayed
+                ) {
+                    return@withContext
+                }
+
+                // Rapid-fire failure check (tightened to 3 attempts for ride safety)
+                val now = System.currentTimeMillis()
+                if (now - lastFailureTime < 20_000) {
+                    rapidFailureCount++
+                } else {
+                    rapidFailureCount = 1
+                }
+                lastFailureTime = now
+
+                if (rapidFailureCount >= 3) {
+                    RideLogger.log("NETWORK_SAFETY_TRIGGERED count=$rapidFailureCount")
+                    errorMessage = "Network signal too weak. Pausing auto-advance."
+                    playbackRequested = false
+                    rapidFailureCount = 0
+                    return@withContext
+                }
+
+                val failedStation = request.station
+                RideLogger.log(
+                    "STATION_START_FAILED " +
+                            "delayMs=$timeoutMillis " +
+                            "station='${failedStation.name}' " +
+                            "mediaId='${request.mediaId}' " +
+                            "generation=${request.generation}"
+                )
+
+                mediaController.stop()
+                mediaController.clearMediaItems()
+
+                failedStation.failedThisSession = true
+                scheduleRetryEligibility(failedStation)
+                errorMessage = "Unable to start ${failedStation.name}. Trying the next station."
+
+                if (!requestIsStillActive(request)) {
+                    return@withContext
+                }
+
+                onStationFailed?.invoke(failedStation)
+                resolveFailedStationInBackground(failedStation)
+            }
+        }
+    }
+
+    private fun cancelStartupWatchdog() {
+        startupWatchdogJob?.cancel()
+        startupWatchdogJob = null
+    }
+
+    private fun matchingActiveRequest(): PlaybackRequest? {
+        val request = activeRequest ?: return null
+        val currentMediaId = controller?.currentMediaItem?.mediaId.orEmpty()
+        return request.takeIf { currentMediaId == request.mediaId }
+    }
+
+    private fun requestIsStillActive(request: PlaybackRequest): Boolean {
+        return activeRequest?.generation == request.generation &&
+                activeRequest?.mediaId == request.mediaId
+    }
+
+    private fun formatNowPlayingText(stationName: String, title: String, artist: String): String {
+        val cleanTitle = title.takeUnless {
+            it.equals(stationName, ignoreCase = true)
+        }.orEmpty()
+
+        return when {
+            artist.isNotBlank() && cleanTitle.isNotBlank() -> "$artist — $cleanTitle"
+            cleanTitle.isNotBlank() -> cleanTitle
+            artist.isNotBlank() -> artist
+            else -> ""
+        }
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun inferMimeType(url: String): String {
+        val cleanUrl = url.lowercase().split('?')[0]
+        return when {
+            cleanUrl.endsWith(".m3u8") || cleanUrl.contains("m3u8") -> MimeTypes.APPLICATION_M3U8
+            cleanUrl.endsWith(".aac") || cleanUrl.contains("aac") -> MimeTypes.AUDIO_AAC
+            cleanUrl.endsWith(".mp3") || cleanUrl.contains("mp3") -> MimeTypes.AUDIO_MPEG
+            cleanUrl.endsWith(".ogg") || cleanUrl.contains("ogg") -> MimeTypes.AUDIO_OGG
+            cleanUrl.endsWith(".wav") || cleanUrl.contains("wav") -> MimeTypes.AUDIO_WAV
+            else -> MimeTypes.AUDIO_MPEG // Default to MPEG for radio streams
+        }
+    }
+
+    private fun buildMediaId(stationId: Long, generation: Long): String {
+        return "$stationId:$generation"
+    }
+
+    private fun preferredPlaybackUrl(station: Station): String {
+        val savedResolvedUrl = station.resolvedStreamUrl.trim()
+        return if (station.streamVerified && savedResolvedUrl.isNotBlank()) {
+            savedResolvedUrl
+        } else {
+            station.streamUrl
+        }
+    }
+
+    private fun isTemporaryNetworkFailure(error: PlaybackException): Boolean {
+        return error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+                error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
+    }
+
+    private fun scheduleRetryEligibility(station: Station) {
+        retryEligibilityJobs.remove(station.id)?.cancel()
+
+        retryEligibilityJobs[station.id] = resolverScope.launch {
+            delay(FAILED_STATION_RETRY_DELAY_MILLISECONDS)
+
+            withContext(Dispatchers.Main) {
+                station.failedThisSession = false
+                retryEligibilityJobs.remove(station.id)
+            }
+        }
+    }
+
+    private fun cancelRetryEligibility(station: Station) {
+        retryEligibilityJobs.remove(station.id)?.cancel()
+    }
+
+    private fun resolveFailedStationInBackground(station: Station) {
+        synchronized(stationsBeingResolved) {
+            if (!stationsBeingResolved.add(station.id)) {
+                return
+            }
+        }
+
+        resolverScope.launch {
+            try {
+                val result = streamResolver.resolve(station)
+                val resolvedUrl = result.resolvedUrl?.trim().orEmpty()
+                if (result.success && result.verified && resolvedUrl.isNotBlank()) {
+                    station.resolvedStreamUrl = resolvedUrl
+                    station.streamVerified = true
+                    station.lastVerified = System.currentTimeMillis()
+                    station.failedThisSession = false
+                    cancelRetryEligibility(station)
+                    appPreferences.saveStationRepair(station)
+
+                    withContext(Dispatchers.Main) {
+                        onStationResolved?.invoke(station, result)
+                    }
+                }
+            } finally {
+                synchronized(stationsBeingResolved) {
+                    stationsBeingResolved.remove(station.id)
+                }
+            }
+        }
+    }
+
+    fun stop() {
+        cancelStartupWatchdog()
+        cancelStallWatchdog()
+        cancelAudioProgressWatchdog()
+        nextGeneration++
+
+        activeRequest = null
+        pendingRequest = null
+        errorMessage = null
+        nowPlayingArtworkUri = null
+
+        controller?.run {
+            stop()
+            clearMediaItems()
+        }
+
+        isPlaying = false
+        playbackRequested = false
+        connecting = false
+        activeRequestHasPlayed = false
+    }
+
+    fun release() {
+        cancelStartupWatchdog()
+        cancelStallWatchdog()
+        cancelAudioProgressWatchdog()
+        retryEligibilityJobs.values.forEach { it.cancel() }
+        retryEligibilityJobs.clear()
+        nextGeneration++
+
+        pendingRequest = null
+        activeRequest = null
+        onStationFailed = null
+        onStationResolved = null
+
+        resolverScope.cancel()
+        controller?.removeListener(playerListener)
+        controller = null
+
+        MediaController.releaseFuture(controllerFuture)
+    }
+
+    companion object {
+        private const val STARTUP_TIMEOUT_MILLISECONDS = 8_000L // Reduced from 12s to 8s
+        private const val STALL_FAILURE_TIMEOUT_MILLISECONDS = 10_000L // Reduced from 15s to 10s
+        private const val FAILED_STATION_RETRY_DELAY_MILLISECONDS = 15 * 60 * 1000L
+        const val TEST_STREAM_URL = "https://ice5.somafm.com/groovesalad-128-mp3"
+    }
+}
