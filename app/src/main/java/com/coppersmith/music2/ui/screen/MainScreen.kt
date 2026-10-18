@@ -1374,6 +1374,32 @@ fun MainScreen(viewModel: MusicViewModel) {
 
                     HorizontalDivider(color = Color.DarkGray)
 
+                    // Station Startup Timeout
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Station Startup Timeout", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Auto-advance to next station if sound doesn't start in: ${state.stationTimeoutSeconds}s", color = Color.Gray, fontSize = 12.sp)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            listOf(2 to "2s", 5 to "5s", 8 to "8s", 10 to "10s", 15 to "15s", 30 to "30s").forEach { (sec, labelText) ->
+                                FilterChip(
+                                    selected = state.stationTimeoutSeconds == sec,
+                                    onClick = { viewModel.onSetStationTimeoutSeconds(sec) },
+                                    label = { Text(labelText, fontSize = 11.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Color(0xFFD0BCFF),
+                                        selectedLabelColor = Color.Black
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = Color.DarkGray)
+
                     // RideLogger Diagnostic Export Button
                     Button(
                         onClick = {

@@ -25,6 +25,7 @@ data class PlayerState(
     val announceCategories: Boolean = true,
     val bluetoothBackAction: String = "NEXT_CATEGORY",
     val searchResultLimit: Int = 50,
+    val stationTimeoutSeconds: Int = 8,
     val searchingCategoryName: String? = null,
     val searchError: String? = null,
     val skippedCategoryIds: Set<String> = emptySet(),

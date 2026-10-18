@@ -200,16 +200,9 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
 
             override fun onPlayerError(error: PlaybackException) {
                 Log.e("MusicPlaybackService", "ExoPlayer error [${error.errorCodeName}]: ${error.message}", error)
-                RideLogger.log("EXOPLAYER_ERROR code='${error.errorCodeName}' message='${error.message}' station='${repository.state.value.currentStation?.name}'")
+                RideLogger.log("EXOPLAYER_ERROR code='${error.errorCodeName}' message='${error.message}' station='${repository.state.value.currentStation?.name}' -> Auto-advancing")
                 serviceScope.launch {
-                    if (repository.state.value.isPlaying) {
-                        delay(1500)
-                        player.prepare()
-                        player.play()
-                    } else {
-                        repository.setLoading(false)
-                        repository.setPlaying(false)
-                    }
+                    repository.nextStation()
                 }
             }
         })

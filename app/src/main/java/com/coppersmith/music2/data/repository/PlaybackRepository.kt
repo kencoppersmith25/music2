@@ -13,6 +13,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -137,12 +139,41 @@ object PlaybackRepository {
         }
     }
 
+    private var startupWatchdogJob: Job? = null
+
+    fun setStationTimeoutSeconds(seconds: Int) {
+        val safeSeconds = seconds.coerceIn(2, 300)
+        _state.update { it.copy(stationTimeoutSeconds = safeSeconds) }
+    }
+
     fun setLoading(loading: Boolean) {
         _state.update { it.copy(isLoading = loading) }
     }
 
     fun setPlaying(playing: Boolean) {
+        if (playing) {
+            cancelStartupWatchdog()
+        }
         _state.update { it.copy(isPlaying = playing) }
+    }
+
+    private fun cancelStartupWatchdog() {
+        startupWatchdogJob?.cancel()
+        startupWatchdogJob = null
+    }
+
+    private fun startStartupWatchdog(station: Station) {
+        cancelStartupWatchdog()
+        val timeoutMs = _state.value.stationTimeoutSeconds * 1000L
+        startupWatchdogJob = scope.launch(Dispatchers.IO) {
+            delay(timeoutMs)
+            if (!_state.value.isPlaying) {
+                RideLogger.log("STATION_STARTUP_TIMEOUT station='${station.name}' url='${station.streamUrl}' timeoutMs=$timeoutMs -> Auto-advancing")
+                withContext(Dispatchers.Main) {
+                    nextStation()
+                }
+            }
+        }
     }
 
     fun updateMetadata(title: String?, artist: String?) {
@@ -488,6 +519,7 @@ object PlaybackRepository {
         val station = category.stations[safeStatIdx]
 
         RideLogger.log("COMMIT_STATE catIdx=$safeCatIdx statIdx=$safeStatIdx category='${category.name}' station='${station.name}'")
+        startStartupWatchdog(station)
 
         _state.update {
             it.copy(
