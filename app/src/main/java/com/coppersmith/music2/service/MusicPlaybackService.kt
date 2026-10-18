@@ -14,9 +14,12 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Metadata
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.extractor.metadata.icy.IcyInfo
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
@@ -104,6 +107,18 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         }
     }
 
+    private fun inferMimeType(url: String): String {
+        val cleanUrl = url.lowercase().split('?')[0]
+        return when {
+            cleanUrl.endsWith(".m3u8") || cleanUrl.contains("m3u8") -> MimeTypes.APPLICATION_M3U8
+            cleanUrl.endsWith(".aac") || cleanUrl.contains("aac") -> MimeTypes.AUDIO_AAC
+            cleanUrl.endsWith(".mp3") || cleanUrl.contains("mp3") -> MimeTypes.AUDIO_MPEG
+            cleanUrl.endsWith(".ogg") || cleanUrl.contains("ogg") -> MimeTypes.AUDIO_OGG
+            cleanUrl.endsWith(".wav") || cleanUrl.contains("wav") -> MimeTypes.AUDIO_WAV
+            else -> MimeTypes.AUDIO_MPEG
+        }
+    }
+
     @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
@@ -149,8 +164,30 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
 
         repository.exoPlayer = player
 
-        // 3. Listener for player states, metadata, and error recovery
+        // 3. Listener for player states, metadata, ICY metadata, and error recovery
         player.addListener(object : Player.Listener {
+            override fun onMetadata(metadata: Metadata) {
+                for (i in 0 until metadata.length()) {
+                    val entry = metadata[i]
+                    if (entry is IcyInfo) {
+                        val streamTitle = entry.title?.trim().orEmpty()
+                        if (streamTitle.isNotBlank()) {
+                            var artist = ""
+                            var title = streamTitle
+                            if (streamTitle.contains(" - ")) {
+                                val parts = streamTitle.split(" - ", limit = 2)
+                                artist = parts[0].trim()
+                                title = parts[1].trim()
+                            }
+                            RideLogger.log("ICY_METADATA title='$title' artist='$artist'")
+                            serviceScope.launch {
+                                repository.updateMetadata(title, artist)
+                            }
+                        }
+                    }
+                }
+            }
+
             override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
                 val rawTitle = mediaMetadata.title?.toString() ?: mediaMetadata.displayTitle?.toString()
                 val rawArtist = mediaMetadata.artist?.toString() ?: mediaMetadata.subtitle?.toString()
@@ -298,6 +335,7 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
 
                         val mediaItem = MediaItem.Builder()
                             .setUri(station.streamUrl)
+                            .setMimeType(inferMimeType(station.streamUrl))
                             .setMediaMetadata(metadata)
                             .build()
 
