@@ -247,7 +247,12 @@ object PlaybackRepository {
         val results = mutableListOf<Station>()
         try {
             val encodedTag = URLEncoder.encode(term.trim(), "UTF-8")
-            val url = URL("$baseUrl/json/stations/search?$field=$encodedTag&limit=$limit&hidebroken=true&order=votes&reverse=true")
+            val urlString = if (field == "byname") {
+                "$baseUrl/json/stations/byname/$encodedTag?limit=$limit"
+            } else {
+                "$baseUrl/json/stations/search?$field=$encodedTag&limit=$limit&order=votes&reverse=true"
+            }
+            val url = URL(urlString)
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.setRequestProperty("User-Agent", "NoHandsRadio/1.1 Android")
@@ -346,14 +351,17 @@ object PlaybackRepository {
                             val nameJobs = searchTags.map { t ->
                                 async(Dispatchers.IO) { fetchStationsForTerm(baseUrl, "name", t, searchLimit) }
                             }
+                            val byNameJob = async(Dispatchers.IO) { fetchStationsForTerm(baseUrl, "byname", tag, searchLimit) }
 
                             val tagResults = tagJobs.awaitAll().flatten()
                             val nameResults = nameJobs.awaitAll().flatten()
+                            val byNameResults = byNameJob.await()
 
                             rawStations.addAll(tagResults)
                             rawStations.addAll(nameResults)
+                            rawStations.addAll(byNameResults)
 
-                            if (rawStations.size >= 10) break
+                            if (rawStations.size >= 1) break
                         } catch (_: Exception) {}
                     }
                 }
