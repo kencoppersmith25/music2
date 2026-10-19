@@ -83,6 +83,7 @@ fun MainScreen(viewModel: MusicViewModel) {
     var showCastDialog by remember { mutableStateOf(false) }
     var showTrackInfoDialog by remember { mutableStateOf(false) }
     var showDeleteStationDialog by remember { mutableStateOf(false) }
+    var showDeleteCategoryDialog by remember { mutableStateOf(false) }
     var showSaveStationDialog by remember { mutableStateOf(false) }
 
     val state by viewModel.uiState.collectAsState()
@@ -459,7 +460,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 IconButton(
                                     onClick = {
                                         if (state.categoryIndex >= 0) {
-                                            viewModel.onDeleteCategoryClicked(state.categoryIndex)
+                                            showDeleteCategoryDialog = true
                                         }
                                     },
                                     modifier = Modifier.size(28.dp)
@@ -978,6 +979,47 @@ fun MainScreen(viewModel: MusicViewModel) {
                 }
             }
         }
+    }
+
+    // Delete Category Confirmation Dialog
+    if (showDeleteCategoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteCategoryDialog = false },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Delete Category", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    IconButton(onClick = { showDeleteCategoryDialog = false }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                    }
+                }
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to delete category '${state.currentCategory?.name}' and all its ${state.currentCategory?.stations?.size ?: 0} stations?",
+                    color = Color.LightGray,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (state.categoryIndex >= 0) {
+                            viewModel.onDeleteCategoryClicked(state.categoryIndex)
+                        }
+                        showDeleteCategoryDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Delete Category", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = Color(0xFF1E1E24)
+        )
     }
 
     // Delete Station Confirmation Dialog

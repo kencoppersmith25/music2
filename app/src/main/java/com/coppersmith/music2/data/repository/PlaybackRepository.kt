@@ -310,10 +310,10 @@ object PlaybackRepository {
 
                 when {
                     queryLower.contains("africa") || queryLower.contains("african") -> {
-                        searchTags.addAll(listOf("Lagos", "Johannesburg", "Cairo", "Nairobi", "Casablanca", "Accra", "Cape Town", "Dakar", "Tunis", "Addis Ababa", "African", "Afrobeats"))
+                        searchTags.addAll(listOf("African", "Africa", "Afrobeats", "Afrobeat", "Nigeria", "Kenya", "Ghana", "South Africa", "Lagos", "Johannesburg", "Cairo", "Nairobi", "Casablanca", "Accra", "Cape Town", "Dakar", "Tunis", "Addis Ababa", "Uganda", "Tanzania", "Senegal", "Congo", "Mali", "Zimbabwe"))
                     }
                     queryLower.contains("hawai") || queryLower.contains("hawaiian") -> {
-                        searchTags.addAll(listOf("Honolulu", "Maui", "Kauai", "Kona", "Aloha", "Hilo", "Hawaii Music Live"))
+                        searchTags.addAll(listOf("Hawaiian", "Hawaii", "Honolulu", "Maui", "Kauai", "Kona", "Aloha", "Hilo", "Hawaii Music Live"))
                     }
                     queryLower.contains("classical") || queryLower.contains("symphony") || queryLower.contains("orchestra") || queryLower.contains("opera") -> {
                         searchTags.addAll(listOf("Classical", "Symphony", "Orchestra", "Opera", "Chamber", "Baroque", "Philharmonic", "Choir"))
@@ -357,15 +357,17 @@ object PlaybackRepository {
                             val tagJobs = searchTags.map { t ->
                                 async(Dispatchers.IO) { fetchStationsForTerm(baseUrl, "tag", t, searchLimit) }
                             }
-                            val nameJob = async(Dispatchers.IO) { fetchStationsForTerm(baseUrl, "name", tag, searchLimit) }
+                            val nameJobs = searchTags.map { t ->
+                                async(Dispatchers.IO) { fetchStationsForTerm(baseUrl, "name", t, searchLimit) }
+                            }
 
                             val tagResults = tagJobs.awaitAll().flatten()
-                            val nameResults = nameJob.await()
+                            val nameResults = nameJobs.awaitAll().flatten()
 
                             rawStations.addAll(tagResults)
                             rawStations.addAll(nameResults)
 
-                            if (rawStations.isNotEmpty()) break
+                            if (rawStations.size >= 10) break
                         } catch (_: Exception) {}
                     }
                 }
