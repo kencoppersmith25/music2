@@ -267,8 +267,14 @@ object PlaybackRepository {
                     val name = obj.optString("name", "Unknown Station").trim()
                     val streamUrl = obj.optString("url_resolved", "").ifBlank { obj.optString("url", "") }.trim()
                     val id = obj.optString("stationuuid", i.toString())
+                    val language = obj.optString("language", "").lowercase()
+                    val countryCode = obj.optString("countrycode", "").uppercase()
+                    val votes = obj.optInt("votes", 0)
+
+                    val isEnglishOrUS = language.contains("english") || countryCode in listOf("US", "GB", "CA", "AU", "NZ", "IE")
+
                     if (streamUrl.isNotEmpty() && !streamUrl.contains("localhost")) {
-                        results.add(Station(id = id, name = name, streamUrl = streamUrl))
+                        results.add(Station(id = id, name = name, streamUrl = streamUrl, isEnglishOrUS = isEnglishOrUS, votes = votes))
                     }
                 }
             }
@@ -366,12 +372,20 @@ object PlaybackRepository {
                     }
                 }
 
-                val finalStations = rawStations
+                // Prioritize English / US / UK / CA / AU stations (~80% primary, 20% international)
+                val englishOrUs = rawStations.filter { it.isEnglishOrUS }.sortedByDescending { it.votes }
+                val international = rawStations.filter { !it.isEnglishOrUS }.sortedByDescending { it.votes }
+
+                val primaryQuota = (searchLimit * 0.8).toInt()
+                val primarySelection = englishOrUs.take(primaryQuota)
+                val secondarySelection = international.take(searchLimit - primarySelection.size)
+
+                val combined = (primarySelection + secondarySelection + englishOrUs.drop(primaryQuota) + international.drop(searchLimit - primarySelection.size))
                     .distinctBy { it.streamUrl.lowercase().split('?')[0] }
                     .distinctBy { it.name.lowercase() }
                     .take(searchLimit)
 
-                stations.addAll(finalStations)
+                stations.addAll(combined)
             }
         } catch (e: Exception) {
             e.printStackTrace()

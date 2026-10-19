@@ -5,6 +5,9 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.media.AudioAttributes as AndroidAudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Build
 import android.os.PowerManager
 import android.util.Log
@@ -154,12 +157,65 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         }
     }
 
+    private var audioManager: AudioManager? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
+    private var pausedForPhoneCall = false
+
+    private fun setupAudioFocus() {
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+        val focusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+            when (focusChange) {
+                AudioManager.AUDIOFOCUS_LOSS,
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                    Log.d("MusicPlaybackService", "AudioFocus lost (e.g., phone call). Pausing player.")
+                    RideLogger.log("AUDIO_FOCUS_LOST: Phone call or audio interruption -> Pausing playback")
+                    if (player.isPlaying) {
+                        pausedForPhoneCall = true
+                        serviceScope.launch {
+                            repository.setPlaying(false)
+                        }
+                        player.pause()
+                    }
+                }
+                AudioManager.AUDIOFOCUS_GAIN -> {
+                    Log.d("MusicPlaybackService", "AudioFocus gained. Resuming player.")
+                    RideLogger.log("AUDIO_FOCUS_GAINED: Phone call ended -> Resuming playback")
+                    if (pausedForPhoneCall) {
+                        pausedForPhoneCall = false
+                        serviceScope.launch {
+                            repository.setPlaying(true)
+                        }
+                        player.play()
+                    }
+                }
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val attr = AndroidAudioAttributes.Builder()
+                .setUsage(AndroidAudioAttributes.USAGE_MEDIA)
+                .setContentType(AndroidAudioAttributes.CONTENT_TYPE_MUSIC)
+                .build()
+
+            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(attr)
+                .setOnAudioFocusChangeListener(focusChangeListener)
+                .setAcceptsDelayedFocusGain(true)
+                .build()
+
+            audioManager?.requestAudioFocus(audioFocusRequest!!)
+        }
+    }
+
     @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
 
         createNotificationChannel()
         promoteToForeground()
+        setupAudioFocus()
 
         // Initialize Text-To-Speech engine for category announcements
         textToSpeech = TextToSpeech(this, this)

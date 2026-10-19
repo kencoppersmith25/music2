@@ -3,7 +3,9 @@ package com.coppersmith.music2.data.model
 data class Station(
     val id: String,
     val name: String,
-    val streamUrl: String
+    val streamUrl: String,
+    val isEnglishOrUS: Boolean = false,
+    val votes: Int = 0
 )
 
 data class Category(
@@ -29,7 +31,16 @@ data class PlayerState(
     val searchingCategoryName: String? = null,
     val searchError: String? = null,
     val skippedCategoryIds: Set<String> = emptySet(),
-    val skippedStationIds: Set<String> = emptySet()
+    val skippedStationIds: Set<String> = emptySet(),
+    val recentlyPlayedTracks: List<PlayedTrack> = emptyList()
+)
+
+data class PlayedTrack(
+    val id: String,
+    val title: String,
+    val artist: String,
+    val stationName: String,
+    val timestampMs: Long
 )
 
 data class TrackInfoResult(
