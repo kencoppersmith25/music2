@@ -331,36 +331,56 @@ fun MainScreen(viewModel: MusicViewModel) {
                     }
                 }
 
-                // Category Chips Row
-                Row(
+                // 2-Row Horizontally Scrollable Category Chips
+                val row1Chips = listOf(
+                    "Classical", "Jazz", "Blues", "60s", "70s", "80s", "90s",
+                    "Rock", "Pop", "Country", "Soul", "Folk", "Gospel", "Big Band"
+                )
+                val row2Chips = listOf(
+                    "African", "Hawaiian", "Celtic", "Electronic", "World", "College", "Latin",
+                    "Reggae", "Metal", "Oldies", "Chillout", "Soundtrack", "Talk", "News"
+                )
+
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    val chips = listOf(
-                        "Classical", "Jazz", "Blues", "60s", "70s", "80s", "90s",
-                        "Rock", "Pop", "Country", "Electronic", "World", "College", "Latin"
-                    )
-                    chips.forEach { chipName ->
-                        val isSelected = state.currentCategory?.name?.equals(chipName, ignoreCase = true) == true
-                        Surface(
-                            onClick = {
-                                onPerformCategorySearch(chipName)
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            color = if (isSelected) Color(0xFF5C5470) else Color(0xFF1E1E24),
-                            modifier = Modifier.height(34.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier.padding(horizontal = 14.dp),
-                                contentAlignment = Alignment.Center
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row1Chips.forEach { chipName ->
+                            val isSelected = state.currentCategory?.name?.equals(chipName, ignoreCase = true) == true
+                            Surface(
+                                onClick = { onPerformCategorySearch(chipName) },
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (isSelected) Color(0xFF5C5470) else Color(0xFF1E1E24),
+                                modifier = Modifier.height(32.dp)
                             ) {
-                                Text(
-                                    text = chipName,
-                                    color = Color.White,
-                                    fontSize = 13.sp
-                                )
+                                Box(
+                                    modifier = Modifier.padding(horizontal = 14.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(text = chipName, color = Color.White, fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row2Chips.forEach { chipName ->
+                            val isSelected = state.currentCategory?.name?.equals(chipName, ignoreCase = true) == true
+                            Surface(
+                                onClick = { onPerformCategorySearch(chipName) },
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (isSelected) Color(0xFF5C5470) else Color(0xFF1E1E24),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.padding(horizontal = 14.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(text = chipName, color = Color.White, fontSize = 13.sp)
+                                }
                             }
                         }
                     }

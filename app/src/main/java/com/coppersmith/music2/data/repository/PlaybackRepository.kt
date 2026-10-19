@@ -309,14 +309,41 @@ object PlaybackRepository {
                 val searchTags = mutableListOf(tag)
 
                 when {
-                    queryLower.contains("classical") || queryLower.contains("symphony") || queryLower.contains("orchestra") -> {
-                        searchTags.addAll(listOf("Classical", "Symphony", "Orchestra", "Opera", "Chamber", "Baroque", "Philharmonic"))
+                    queryLower.contains("africa") || queryLower.contains("african") -> {
+                        searchTags.addAll(listOf("Lagos", "Johannesburg", "Cairo", "Nairobi", "Casablanca", "Accra", "Cape Town", "Dakar", "Tunis", "Addis Ababa", "African", "Afrobeats"))
+                    }
+                    queryLower.contains("hawai") || queryLower.contains("hawaiian") -> {
+                        searchTags.addAll(listOf("Honolulu", "Maui", "Kauai", "Kona", "Aloha", "Hilo", "Hawaii Music Live"))
+                    }
+                    queryLower.contains("classical") || queryLower.contains("symphony") || queryLower.contains("orchestra") || queryLower.contains("opera") -> {
+                        searchTags.addAll(listOf("Classical", "Symphony", "Orchestra", "Opera", "Chamber", "Baroque", "Philharmonic", "Choir"))
                     }
                     queryLower.contains("jazz") || queryLower.contains("blues") -> {
-                        searchTags.addAll(listOf("Jazz", "Blues", "Smooth Jazz", "Bebop"))
+                        searchTags.addAll(listOf("Jazz", "Blues", "Smooth Jazz", "New Orleans", "Chicago Jazz", "Bebop"))
                     }
-                    queryLower.contains("electronic") || queryLower.contains("techno") || queryLower.contains("house") -> {
-                        searchTags.addAll(listOf("Electronic", "Techno", "House", "Trance", "Ambient"))
+                    queryLower.contains("electronic") || queryLower.contains("edm") || queryLower.contains("techno") || queryLower.contains("house") -> {
+                        searchTags.addAll(listOf("Electronic", "Techno", "House", "Trance", "Ambient", "Ibiza", "Berlin Electronic"))
+                    }
+                    queryLower.contains("france") || queryLower.contains("french") -> {
+                        searchTags.addAll(listOf("Paris", "Lyon", "Marseille", "Nice", "Bordeaux", "Toulouse", "France"))
+                    }
+                    queryLower.contains("germany") || queryLower.contains("german") -> {
+                        searchTags.addAll(listOf("Berlin", "Munich", "Frankfurt", "Hamburg", "Cologne", "Germany"))
+                    }
+                    queryLower.contains("united kingdom") || queryLower.contains("uk") || queryLower.contains("british") || queryLower.contains("england") -> {
+                        searchTags.addAll(listOf("London", "Manchester", "Birmingham", "Glasgow", "Edinburgh", "BBC", "United Kingdom"))
+                    }
+                    queryLower.contains("japan") || queryLower.contains("japanese") -> {
+                        searchTags.addAll(listOf("Tokyo", "Osaka", "Kyoto", "Nagoya", "Fukuoka", "Japan"))
+                    }
+                    queryLower.contains("india") || queryLower.contains("indian") -> {
+                        searchTags.addAll(listOf("Mumbai", "Delhi", "Bangalore", "Chennai", "Kolkata", "India"))
+                    }
+                    queryLower.contains("latin") || queryLower.contains("salsa") || queryLower.contains("samba") -> {
+                        searchTags.addAll(listOf("Latin", "Salsa", "Bachata", "Reggaeton", "Cumbia", "Merengue"))
+                    }
+                    queryLower.contains("celtic") || queryLower.contains("irish") -> {
+                        searchTags.addAll(listOf("Celtic", "Irish", "Dublin", "Galway", "Belfast", "Scotland"))
                     }
                     else -> {}
                 }
