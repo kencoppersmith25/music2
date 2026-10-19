@@ -276,20 +276,6 @@ object PlaybackRepository {
         val displayName = if (categoryName.startsWith("Search:", ignoreCase = true)) categoryName else "Search: ${categoryName.replaceFirstChar { it.uppercase() }}"
         val searchCatId = "cat_search_${tag.lowercase().replace(" ", "_")}"
 
-        val existingIndex = playlist.indexOfFirst {
-            it.id == searchCatId || it.name.equals(displayName, ignoreCase = true)
-        }
-        if (existingIndex != -1 && playlist[existingIndex].stations.isNotEmpty()) {
-            withContext(Dispatchers.Main) {
-                commitState(existingIndex, 0)
-                exoPlayer?.let { player ->
-                    player.prepare()
-                    player.play()
-                }
-            }
-            return@withLock
-        }
-
         val cleanSearchTerm = categoryName.substringAfter("Search: ").trim().replaceFirstChar { it.uppercase() }
         RideLogger.log("SEARCH_STARTED query='$tag' term='$cleanSearchTerm'")
         setLoading(true)
