@@ -743,78 +743,92 @@ object PlaybackRepository {
         return list
     }
 
-    suspend fun fetchTrackDetailsOnline(artist: String?, title: String?, stationName: String?): TrackInfoResult {
-        val query = when {
-            !artist.isNullOrBlank() && !title.isNullOrBlank() && artist != "Live Radio Stream" -> "$artist $title"
-            !title.isNullOrBlank() -> title
-            !artist.isNullOrBlank() -> artist
-            else -> stationName ?: "Music Radio"
-        }
+    private fun queryWikipediaSummary(queryTerm: String): TrackInfoResult? {
+        try {
+            val encodedQuery = URLEncoder.encode(queryTerm, "UTF-8")
+            val searchUrl = URL("https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encodedQuery&format=json")
+            val conn = searchUrl.openConnection() as HttpURLConnection
+            conn.setRequestProperty("User-Agent", "Music2RadioApp/1.0")
+            conn.connectTimeout = 3000
+            conn.readTimeout = 3000
 
-        return withContext(Dispatchers.IO) {
-            try {
-                val encodedQuery = URLEncoder.encode(query, "UTF-8")
-                val searchUrl = URL("https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encodedQuery&format=json")
-                val conn = searchUrl.openConnection() as HttpURLConnection
-                conn.setRequestProperty("User-Agent", "Music2RadioApp/1.0")
-                conn.connectTimeout = 4000
-                conn.readTimeout = 4000
+            if (conn.responseCode == 200) {
+                val text = conn.inputStream.bufferedReader().use { it.readText() }
+                conn.disconnect()
 
-                if (conn.responseCode == 200) {
-                    val text = conn.inputStream.bufferedReader().readText()
-                    conn.disconnect()
+                val json = JSONObject(text)
+                val searchArr = json.optJSONObject("query")?.optJSONArray("search")
+                if (searchArr != null && searchArr.length() > 0) {
+                    val firstItem = searchArr.getJSONObject(0)
+                    val pageTitle = firstItem.optString("title")
+                    val snippet = firstItem.optString("snippet")
+                        .replace(Regex("<[^>]*>"), "")
+                        .replace("&quot;", "\"")
+                        .replace("&#039;", "'")
+                        .replace("&amp;", "&")
 
-                    val json = JSONObject(text)
-                    val searchArr = json.optJSONObject("query")?.optJSONArray("search")
-                    if (searchArr != null && searchArr.length() > 0) {
-                        val firstItem = searchArr.getJSONObject(0)
-                        val pageTitle = firstItem.optString("title")
-                        val snippet = firstItem.optString("snippet")
-                            .replace(Regex("<[^>]*>"), "")
-                            .replace("&quot;", "\"")
-                            .replace("&#039;", "'")
-                            .replace("&amp;", "&")
+                    val encodedPageTitle = URLEncoder.encode(pageTitle, "UTF-8")
+                    val summaryUrl = URL("https://en.wikipedia.org/api/rest_v1/page/summary/$encodedPageTitle")
+                    val sumConn = summaryUrl.openConnection() as HttpURLConnection
+                    sumConn.setRequestProperty("User-Agent", "Music2RadioApp/1.0")
+                    sumConn.connectTimeout = 3000
+                    sumConn.readTimeout = 3000
 
-                        val encodedPageTitle = URLEncoder.encode(pageTitle, "UTF-8")
-                        val summaryUrl = URL("https://en.wikipedia.org/api/rest_v1/page/summary/$encodedPageTitle")
-                        val sumConn = summaryUrl.openConnection() as HttpURLConnection
-                        sumConn.setRequestProperty("User-Agent", "Music2RadioApp/1.0")
-                        sumConn.connectTimeout = 4000
-                        sumConn.readTimeout = 4000
+                    if (sumConn.responseCode == 200) {
+                        val sumText = sumConn.inputStream.bufferedReader().use { it.readText() }
+                        sumConn.disconnect()
+                        val sumJson = JSONObject(sumText)
+                        val extract = sumJson.optString("extract").ifBlank { snippet }
+                        val pageUrl = sumJson.optJSONObject("content_urls")
+                            ?.optJSONObject("desktop")?.optString("page", "") ?: "https://en.wikipedia.org/wiki/$encodedPageTitle"
 
-                        if (sumConn.responseCode == 200) {
-                            val sumText = sumConn.inputStream.bufferedReader().readText()
-                            sumConn.disconnect()
-                            val sumJson = JSONObject(sumText)
-                            val extract = sumJson.optString("extract").ifBlank { snippet }
-                            val pageUrl = sumJson.optJSONObject("content_urls")
-                                ?.optJSONObject("desktop")?.optString("page", "") ?: "https://en.wikipedia.org/wiki/$encodedPageTitle"
-
-                            return@withContext TrackInfoResult(
+                        if (extract.isNotBlank() && extract.length > 30) {
+                            return TrackInfoResult(
                                 title = pageTitle,
                                 description = extract,
                                 wikiUrl = pageUrl,
-                                query = query
+                                query = queryTerm
                             )
                         }
-
-                        return@withContext TrackInfoResult(
-                            title = pageTitle,
-                            description = snippet,
-                            wikiUrl = "https://en.wikipedia.org/wiki/$encodedPageTitle",
-                            query = query
-                        )
                     }
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
+            }
+        } catch (_: Exception) {}
+        return null
+    }
+
+    suspend fun fetchTrackDetailsOnline(artist: String?, title: String?, stationName: String?): TrackInfoResult {
+        return withContext(Dispatchers.IO) {
+            val cleanArtist = artist?.trim()?.takeIf { it.isNotBlank() && it != "Live Radio Stream" }
+            val cleanTitle = title?.trim()?.takeIf { it.isNotBlank() }
+
+            val queriesToTry = mutableListOf<String>()
+            if (cleanArtist != null && cleanTitle != null) {
+                queriesToTry.add("$cleanArtist $cleanTitle")
+                queriesToTry.add(cleanTitle)
+                queriesToTry.add(cleanArtist)
+            } else if (cleanTitle != null) {
+                queriesToTry.add(cleanTitle)
+            } else if (cleanArtist != null) {
+                queriesToTry.add(cleanArtist)
+            }
+            if (stationName != null) {
+                queriesToTry.add(stationName)
             }
 
+            for (q in queriesToTry) {
+                val res = queryWikipediaSummary(q)
+                if (res != null) {
+                    return@withContext res
+                }
+            }
+
+            val fallbackQuery = cleanTitle ?: cleanArtist ?: stationName ?: "Music Radio"
             return@withContext TrackInfoResult(
-                title = query,
-                description = "No detailed Wikipedia article found automatically for '$query'. Tap below to search directly on Google.",
+                title = fallbackQuery,
+                description = "No detailed Wikipedia summary found automatically for '$fallbackQuery'. Tap below to search directly on Google for recordings, score history, and composer details.",
                 wikiUrl = null,
-                query = query
+                query = fallbackQuery
             )
         }
     }
