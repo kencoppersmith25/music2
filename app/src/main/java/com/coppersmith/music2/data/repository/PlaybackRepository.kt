@@ -372,7 +372,12 @@ object PlaybackRepository {
                     }
                 }
 
-                stations.addAll(rawStations.distinctBy { it.streamUrl.lowercase().split('?')[0] }.distinctBy { it.name.lowercase() })
+                val finalStations = rawStations
+                    .distinctBy { it.streamUrl.lowercase().split('?')[0] }
+                    .distinctBy { it.name.lowercase() }
+                    .take(searchLimit)
+
+                stations.addAll(finalStations)
             }
         } catch (e: Exception) {
             e.printStackTrace()

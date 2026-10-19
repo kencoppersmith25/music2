@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -532,6 +533,13 @@ fun MainScreen(viewModel: MusicViewModel) {
 
                 // Dropdown of ALL Categories when category title on left is clicked
                 if (categoriesListExpanded && loadedCategories.isNotEmpty()) {
+                    val categoriesListState = rememberLazyListState()
+                    LaunchedEffect(categoriesListExpanded, state.categoryIndex) {
+                        if (categoriesListExpanded && state.categoryIndex in loadedCategories.indices) {
+                            categoriesListState.scrollToItem(state.categoryIndex)
+                        }
+                    }
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -567,6 +575,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             }
                             HorizontalDivider(color = Color(0xFF2E2E38), thickness = 1.dp)
                             LazyColumn(
+                                state = categoriesListState,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
@@ -646,6 +655,14 @@ fun MainScreen(viewModel: MusicViewModel) {
 
                 // Dropdown of stations in folder/category when list icon is clicked
                 if (stationsListExpanded && (state.currentCategory?.stations?.isNotEmpty() == true)) {
+                    val stationsListState = rememberLazyListState()
+                    LaunchedEffect(stationsListExpanded, state.stationIndex) {
+                        val currentStations = state.currentCategory?.stations
+                        if (stationsListExpanded && currentStations != null && state.stationIndex in currentStations.indices) {
+                            stationsListState.scrollToItem(state.stationIndex)
+                        }
+                    }
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -681,6 +698,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             }
                             HorizontalDivider(color = Color(0xFF2E2E38), thickness = 1.dp)
                             LazyColumn(
+                                state = stationsListState,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
