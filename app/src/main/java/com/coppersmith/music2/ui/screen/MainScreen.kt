@@ -1145,26 +1145,31 @@ fun MainScreen(viewModel: MusicViewModel) {
                         }
                     }
 
-                    // Option 2: Suggested Category (e.g. Search: Classical -> Classical)
+                    // Option 2: Suggested Category on single line
                     if (!suggestedName.isNullOrBlank()) {
                         HorizontalDivider(color = Color(0xFF2E2E38))
-                        Text("Suggested Clean Category:", color = Color.Gray, fontSize = 12.sp)
-                        Button(
-                            onClick = {
-                                state.currentStation?.let { station ->
-                                    viewModel.onSaveStationToCategory(station, suggestedName)
-                                }
-                                showSaveStationDialog = false
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C5470)),
-                            modifier = Modifier.fillMaxWidth()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Save to '$suggestedName'", color = Color.White)
+                            Text("Suggested:", color = Color.Gray, fontSize = 13.sp)
+                            Button(
+                                onClick = {
+                                    state.currentStation?.let { station ->
+                                        viewModel.onSaveStationToCategory(station, suggestedName)
+                                    }
+                                    showSaveStationDialog = false
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C5470)),
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Text("Save to '$suggestedName'", color = Color.White, fontSize = 13.sp)
+                            }
                         }
                     }
 
                     HorizontalDivider(color = Color(0xFF2E2E38))
-                    Text("Select Existing or Predefined Category:", color = Color.Gray, fontSize = 12.sp)
 
                     // Option 3: Loaded categories + Predefined Canned Categories in unified scrollable list
                     LazyColumn(
