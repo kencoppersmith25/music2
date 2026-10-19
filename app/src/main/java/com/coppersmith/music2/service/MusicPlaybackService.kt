@@ -2,9 +2,11 @@ package com.coppersmith.music2.service
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.coppersmith.music2.R
@@ -116,6 +118,39 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
             cleanUrl.endsWith(".ogg") || cleanUrl.contains("ogg") -> MimeTypes.AUDIO_OGG
             cleanUrl.endsWith(".wav") || cleanUrl.contains("wav") -> MimeTypes.AUDIO_WAV
             else -> MimeTypes.AUDIO_MPEG
+        }
+    }
+
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    private fun acquireWakeLock() {
+        try {
+            if (wakeLock == null) {
+                val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+                wakeLock = powerManager.newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK,
+                    "Music2:PlaybackWakeLock"
+                ).apply {
+                    setReferenceCounted(false)
+                }
+            }
+            if (wakeLock?.isHeld == false) {
+                wakeLock?.acquire(60 * 60 * 1000L)
+                Log.d("MusicPlaybackService", "Acquired PARTIAL_WAKE_LOCK for auto-sleep stream playback")
+            }
+        } catch (e: Exception) {
+            Log.e("MusicPlaybackService", "Error acquiring WakeLock: ${e.message}")
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+                Log.d("MusicPlaybackService", "Released PARTIAL_WAKE_LOCK")
+            }
+        } catch (e: Exception) {
+            Log.e("MusicPlaybackService", "Error releasing WakeLock: ${e.message}")
         }
     }
 
@@ -317,7 +352,10 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                     Log.d("MusicPlaybackService", "State update: station=${station.name}, url=${station.streamUrl}, isPlaying=${state.isPlaying}, currentUrl=$currentUrl, isErrorOrIdle=$isErrorOrIdle")
 
                     if (state.isPlaying) {
+                        acquireWakeLock()
                         promoteToForeground(station.name, state.currentCategory?.name ?: "Live Radio Stream")
+                    } else {
+                        releaseWakeLock()
                     }
 
                     if (currentUrl != station.streamUrl || isErrorOrIdle) {
@@ -365,6 +403,7 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
     override fun onTaskRemoved(rootIntent: Intent?) {
         Log.d("MusicPlaybackService", "App swiped away from recent tasks. Stopping playback.")
         RideLogger.log("SERVICE_TASK_REMOVED: User swiped app away from recent tasks.")
+        releaseWakeLock()
         serviceScope.launch {
             repository.setPlaying(false)
         }
@@ -375,6 +414,7 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
     }
 
     override fun onDestroy() {
+        releaseWakeLock()
         repository.exoPlayer = null
         textToSpeech?.run {
             stop()
