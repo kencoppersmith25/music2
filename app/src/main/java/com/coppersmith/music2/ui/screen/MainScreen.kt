@@ -839,7 +839,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                         )
 
                         Text(
-                            text = "Tap for composer & orchestra background info 🔍",
+                            text = "Tap for web search info 🔍",
                             color = Color(0xFF9E9EAE),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Normal
@@ -891,6 +891,93 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         viewModel.onToggleStationSkipped(station.id)
                                     }
                                 }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Inline Composer & History Summary Card (Auto-populated on Main Screen)
+            var autoTrackInfo by remember { mutableStateOf<TrackInfoResult?>(null) }
+            var autoFetching by remember { mutableStateOf(false) }
+
+            LaunchedEffect(state.currentStation, state.trackTitle, state.artistName) {
+                if (state.trackTitle != null || state.artistName != null || state.currentStation != null) {
+                    autoFetching = true
+                    autoTrackInfo = viewModel.fetchTrackDetailsOnline(
+                        artist = state.artistName,
+                        title = state.trackTitle,
+                        stationName = state.currentStation?.name
+                    )
+                    autoFetching = false
+                }
+            }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 80.dp, max = 140.dp)
+                    .clickable { showTrackInfoDialog = true },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1B22))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Composer & History Info 📖",
+                            color = Color(0xFFD0BCFF),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Tap for web search 🔍",
+                            color = Color.Gray,
+                            fontSize = 11.sp
+                        )
+                    }
+
+                    HorizontalDivider(color = Color(0xFF2B2B36), thickness = 1.dp)
+
+                    if (autoFetching) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(color = Color(0xFFD0BCFF), modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Looking up composer info...", color = Color.Gray, fontSize = 12.sp)
+                        }
+                    } else {
+                        val info = autoTrackInfo
+                        if (info != null && info.description.isNotBlank()) {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                item {
+                                    Text(
+                                        text = info.description,
+                                        color = Color.LightGray,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp
+                                    )
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = "No automatic summary available for this track. Tap to search Google.",
+                                color = Color.Gray,
+                                fontSize = 12.sp
                             )
                         }
                     }
