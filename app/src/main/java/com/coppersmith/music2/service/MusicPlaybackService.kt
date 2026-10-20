@@ -218,6 +218,30 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         player: Player
     ) : ForwardingPlayer(player) {
 
+        override fun play() {
+            RideLogger.log("SYSTEM_LOCKSCREEN_COMMAND: Play")
+            serviceScope.launch {
+                repository.setPlaying(true)
+            }
+            super.play()
+        }
+
+        override fun pause() {
+            RideLogger.log("SYSTEM_LOCKSCREEN_COMMAND: Pause")
+            serviceScope.launch {
+                repository.setPlaying(false)
+            }
+            super.pause()
+        }
+
+        override fun stop() {
+            RideLogger.log("SYSTEM_LOCKSCREEN_COMMAND: Stop")
+            serviceScope.launch {
+                repository.setPlaying(false)
+            }
+            super.stop()
+        }
+
         override fun getAvailableCommands(): Player.Commands {
             return super.getAvailableCommands()
                 .buildUpon()
