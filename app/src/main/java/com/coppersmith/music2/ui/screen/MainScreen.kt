@@ -782,25 +782,24 @@ fun MainScreen(viewModel: MusicViewModel) {
                 }
             }
 
-            // Middle: Compact Now Playing Card (Clickable for Google/Wikipedia Detailed Track Lookup)
+            // Middle: Compact Now Playing Card (Docked snugly under Category Card)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-                    .clickable { showTrackInfoDialog = true },
+                    .padding(vertical = 2.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         // Station Name with (1 of 5) and Auto-Marquee
                         val totalStations = state.currentCategory?.stations?.size ?: 0
@@ -836,13 +835,6 @@ fun MainScreen(viewModel: MusicViewModel) {
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.basicMarquee()
-                        )
-
-                        Text(
-                            text = "Tap for web search info 🔍",
-                            color = Color(0xFF9E9EAE),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Normal
                         )
                     }
 
@@ -916,17 +908,18 @@ fun MainScreen(viewModel: MusicViewModel) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 80.dp, max = 140.dp)
-                    .clickable { showTrackInfoDialog = true },
+                    .heightIn(min = 80.dp, max = 130.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1B22))
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    val searchQuery = autoTrackInfo?.query ?: "${state.artistName ?: ""} ${state.trackTitle ?: ""}".trim()
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -938,22 +931,34 @@ fun MainScreen(viewModel: MusicViewModel) {
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        Text(
-                            text = "Tap for web search 🔍",
-                            color = Color.Gray,
-                            fontSize = 11.sp
-                        )
+
+                        Surface(
+                            onClick = {
+                                if (searchQuery.isNotBlank()) {
+                                    val url = "https://www.google.com/search?q=" + URLEncoder.encode(searchQuery, "UTF-8")
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                    context.startActivity(intent)
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF383842),
+                            modifier = Modifier.height(24.dp)
+                        ) {
+                            Box(modifier = Modifier.padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
+                                Text("Search Google 🔍", color = Color(0xFFD0BCFF), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            }
+                        }
                     }
 
                     HorizontalDivider(color = Color(0xFF2B2B36), thickness = 1.dp)
 
                     if (autoFetching) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            CircularProgressIndicator(color = Color(0xFFD0BCFF), modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(color = Color(0xFFD0BCFF), modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Looking up composer info...", color = Color.Gray, fontSize = 12.sp)
                         }
@@ -975,7 +980,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             }
                         } else {
                             Text(
-                                text = "No automatic summary available for this track. Tap to search Google.",
+                                text = "No automatic summary found for '$searchQuery'. Tap 'Search Google 🔍' above for recordings and composer details.",
                                 color = Color.Gray,
                                 fontSize = 12.sp
                             )
