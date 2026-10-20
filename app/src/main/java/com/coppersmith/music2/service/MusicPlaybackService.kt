@@ -17,6 +17,7 @@ import android.view.KeyEvent
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Metadata
@@ -212,6 +213,71 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
     }
 
     @OptIn(UnstableApi::class)
+    private inner class SystemMediaCommandPlayer(
+        player: Player
+    ) : ForwardingPlayer(player) {
+
+        override fun getAvailableCommands(): Player.Commands {
+            return super.getAvailableCommands()
+                .buildUpon()
+                .add(Player.COMMAND_PLAY_PAUSE)
+                .add(Player.COMMAND_STOP)
+                .add(Player.COMMAND_SEEK_TO_NEXT)
+                .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                .build()
+        }
+
+        override fun isCommandAvailable(command: Int): Boolean {
+            return when (command) {
+                Player.COMMAND_PLAY_PAUSE,
+                Player.COMMAND_STOP,
+                Player.COMMAND_SEEK_TO_NEXT,
+                Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
+                Player.COMMAND_SEEK_TO_PREVIOUS,
+                Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> true
+                else -> super.isCommandAvailable(command)
+            }
+        }
+
+        override fun hasNextMediaItem(): Boolean = true
+        override fun hasPreviousMediaItem(): Boolean = true
+
+        override fun seekToNext() {
+            RideLogger.log("SYSTEM_LOCKSCREEN_COMMAND: Next Station")
+            repository.nextStation()
+        }
+
+        override fun seekToNextMediaItem() {
+            RideLogger.log("SYSTEM_LOCKSCREEN_COMMAND: Next Station")
+            repository.nextStation()
+        }
+
+        override fun seekToPrevious() {
+            RideLogger.log("SYSTEM_LOCKSCREEN_COMMAND: Previous Station / Category")
+            if (repository.state.value.bluetoothBackAction == "NEXT_CATEGORY") {
+                serviceScope.launch {
+                    repository.nextCategory()
+                }
+            } else {
+                repository.previousStation()
+            }
+        }
+
+        override fun seekToPreviousMediaItem() {
+            RideLogger.log("SYSTEM_LOCKSCREEN_COMMAND: Previous Station / Category")
+            if (repository.state.value.bluetoothBackAction == "NEXT_CATEGORY") {
+                serviceScope.launch {
+                    repository.nextCategory()
+                }
+            } else {
+                repository.previousStation()
+            }
+        }
+    }
+
+    @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
 
@@ -337,8 +403,30 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
             }
         })
 
-        // MediaSession callback to handle Bluetooth media buttons (Play, Pause, Next, Previous)
+        val systemMediaCommandPlayer = SystemMediaCommandPlayer(player)
+
+        // MediaSession callback to handle Bluetooth media buttons (Play, Pause, Next, Previous) and System Controls
         val sessionCallback = object : MediaSession.Callback {
+            override fun onConnect(
+                session: MediaSession,
+                controller: MediaSession.ControllerInfo
+            ): MediaSession.ConnectionResult {
+                val availableSessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().build()
+                val playerCommands = session.player.availableCommands.buildUpon()
+                    .add(Player.COMMAND_PLAY_PAUSE)
+                    .add(Player.COMMAND_STOP)
+                    .add(Player.COMMAND_SEEK_TO_NEXT)
+                    .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                    .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                    .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                    .build()
+
+                return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                    .setAvailableSessionCommands(availableSessionCommands)
+                    .setAvailablePlayerCommands(playerCommands)
+                    .build()
+            }
+
             override fun onMediaButtonEvent(
                 session: MediaSession,
                 controllerInfo: MediaSession.ControllerInfo,
@@ -380,7 +468,7 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
             android.app.PendingIntent.getActivity(this, 0, intent, android.app.PendingIntent.FLAG_IMMUTABLE)
         }
 
-        mediaSession = MediaSession.Builder(this, player)
+        mediaSession = MediaSession.Builder(this, systemMediaCommandPlayer)
             .setCallback(sessionCallback)
             .apply {
                 if (pendingIntent != null) {
