@@ -31,6 +31,9 @@ class MainActivity : ComponentActivity() {
         // Initialize Repository with disk persistence
         com.coppersmith.music2.data.repository.PlaybackRepository.initRepository(this)
 
+        // Initialize AdManager (Google Mobile Ads SDK)
+        com.coppersmith.music2.ads.AdManager.initialize(this)
+
         // Request notification permission on Android 13+ so foreground service notification can display
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {

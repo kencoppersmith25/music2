@@ -974,27 +974,10 @@ fun MainScreen(viewModel: MusicViewModel) {
                     }
                 }
 
-                // Small Ad Space Banner at the very bottom
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "ADVERTISEMENT PLACEHOLDER",
-                            color = Color.Gray,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            letterSpacing = 1.sp
-                        )
-                    }
-                }
+                // Ad Banner at the very bottom
+                com.coppersmith.music2.ads.AdBanner(
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
