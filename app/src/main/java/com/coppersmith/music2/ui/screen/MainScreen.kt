@@ -172,7 +172,14 @@ fun MainScreen(viewModel: MusicViewModel) {
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = { showSettingsDialog = true }) {
+                        IconButton(onClick = {
+                            com.coppersmith.music2.ads.AdManager.maybeShowInterstitial(
+                                context as? Activity,
+                                com.coppersmith.music2.ads.AdReason.OPEN_SETTINGS
+                            ) {
+                                showSettingsDialog = true
+                            }
+                        }) {
                             Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
                         }
                         IconButton(onClick = { showCastDialog = true }) {

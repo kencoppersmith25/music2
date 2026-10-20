@@ -22,5 +22,5 @@ object AdConfig {
         get() = if (IS_DEBUG) TEST_INTERSTITIAL_ID else REAL_INTERSTITIAL_ID
 
     const val SHOW_BANNERS = true
-    const val SHOW_INTERSTITIALS = false
+    const val SHOW_INTERSTITIALS = true
 }
