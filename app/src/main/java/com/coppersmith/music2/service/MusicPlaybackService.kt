@@ -30,6 +30,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.coppersmith.music2.data.repository.PlaybackRepository
@@ -282,6 +283,18 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         super.onCreate()
 
         createNotificationChannel()
+
+        try {
+            setMediaNotificationProvider(
+                DefaultMediaNotificationProvider.Builder(this)
+                    .setChannelId("media_playback_channel")
+                    .setNotificationId(1001)
+                    .build()
+            )
+        } catch (e: Exception) {
+            Log.e("MusicPlaybackService", "Error setting MediaNotificationProvider: ${e.message}")
+        }
+
         promoteToForeground()
         setupAudioFocus()
 
