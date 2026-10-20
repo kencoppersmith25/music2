@@ -160,7 +160,6 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var pausedForPhoneCall = false
-    private var duckedForNotification = false
 
     private fun setupAudioFocus() {
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -168,9 +167,11 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         val focusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
             when (focusChange) {
                 AudioManager.AUDIOFOCUS_LOSS,
-                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                    Log.d("MusicPlaybackService", "AudioFocus lost to Phone Call. Pausing player.")
-                    RideLogger.log("AUDIO_FOCUS_LOST: Phone call -> Muting and pausing playback")
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                    Log.d("MusicPlaybackService", "AudioFocus lost ($focusChange). Muting volume to 0% and pausing player.")
+                    RideLogger.log("AUDIO_FOCUS_LOST ($focusChange): Phone call or interruption -> Muting to 0% and pausing playback")
+                    player.volume = 0.0f
                     if (player.isPlaying) {
                         pausedForPhoneCall = true
                         serviceScope.launch {
@@ -179,24 +180,12 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                         player.pause()
                     }
                 }
-                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                    Log.d("MusicPlaybackService", "AudioFocus ducking for Ride/Mileage prompt. Reducing volume to 50%.")
-                    RideLogger.log("AUDIO_FOCUS_DUCK: Mileage/Nav prompt -> Ducking volume to 50%")
-                    if (player.isPlaying) {
-                        duckedForNotification = true
-                        player.volume = 0.5f
-                    }
-                }
                 AudioManager.AUDIOFOCUS_GAIN -> {
-                    Log.d("MusicPlaybackService", "AudioFocus gained. Restoring volume and player.")
-                    RideLogger.log("AUDIO_FOCUS_GAINED: Restoring volume to 100% and resuming playback")
-                    if (duckedForNotification) {
-                        duckedForNotification = false
-                        player.volume = 1.0f
-                    }
+                    Log.d("MusicPlaybackService", "AudioFocus gained. Restoring volume to 100% and player.")
+                    RideLogger.log("AUDIO_FOCUS_GAINED: Phone call ended -> Restoring volume to 100% and resuming playback")
+                    player.volume = 1.0f
                     if (pausedForPhoneCall) {
                         pausedForPhoneCall = false
-                        player.volume = 1.0f
                         serviceScope.launch {
                             repository.setPlaying(true)
                         }
