@@ -175,7 +175,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                         modifier = Modifier
                             .size(60.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (isLight) Color(0xFFFFFFFF) else Color(0xFF1E1E24)),
+                            .background(bgColor),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
@@ -232,9 +232,9 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 },
                                 placeholder = {
                                     Text(
-                                        "Search category (e.g. Classical)...",
+                                        "Search category or genre...",
                                         color = Color.Gray,
-                                        fontSize = 14.sp
+                                        fontSize = 13.sp
                                     )
                                 },
                                 colors = TextFieldDefaults.colors(
@@ -254,7 +254,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         }
                                     },
                                 singleLine = true,
-                                textStyle = TextStyle(fontSize = 15.sp),
+                                textStyle = TextStyle(fontSize = 14.sp),
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                                 keyboardActions = KeyboardActions(
                                     onSearch = {
@@ -269,17 +269,18 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                if (searchQuery.isNotEmpty()) {
+                                if (searchQuery.isNotEmpty() || dropdownExpanded) {
                                     IconButton(
                                         onClick = {
                                             searchQuery = ""
-                                            dropdownExpanded = true
+                                            dropdownExpanded = false
+                                            focusManager.clearFocus()
                                         },
                                         modifier = Modifier.size(32.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Clear,
-                                            contentDescription = "Clear",
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Clear & Close Dropdown",
                                             tint = Color.Gray,
                                             modifier = Modifier.size(18.dp)
                                         )
@@ -327,30 +328,61 @@ fun MainScreen(viewModel: MusicViewModel) {
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 180.dp),
+                                .heightIn(max = 200.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
                         ) {
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                items(filteredCategories) { category ->
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                onPerformCategorySearch(category)
-                                            }
-                                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Select Category / Genre:",
+                                        color = Color.Gray,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    IconButton(
+                                        onClick = {
+                                            dropdownExpanded = false
+                                            focusManager.clearFocus()
+                                        },
+                                        modifier = Modifier.size(24.dp)
                                     ) {
-                                        Text(
-                                            text = category,
-                                            color = Color.White,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Medium
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Close Dropdown",
+                                            tint = Color.Gray,
+                                            modifier = Modifier.size(16.dp)
                                         )
+                                    }
+                                }
+                                HorizontalDivider(color = Color(0xFF2E2E38), thickness = 1.dp)
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 2.dp)
+                                ) {
+                                    items(filteredCategories) { category ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    onPerformCategorySearch(category)
+                                                }
+                                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                        ) {
+                                            Text(
+                                                text = category,
+                                                color = Color.White,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
                                     }
                                 }
                             }

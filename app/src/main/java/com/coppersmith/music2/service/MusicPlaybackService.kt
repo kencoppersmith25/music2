@@ -350,8 +350,8 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         // 1. Configure HTTP Data Source with Cross-Protocol Redirects for Live Radio Streams
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(4000)
-            .setReadTimeoutMs(4000)
+            .setConnectTimeoutMs(2500)
+            .setReadTimeoutMs(2500)
             .setUserAgent("NoHandsRadio/1.1 Android")
 
         val mediaSourceFactory = DefaultMediaSourceFactory(this)
