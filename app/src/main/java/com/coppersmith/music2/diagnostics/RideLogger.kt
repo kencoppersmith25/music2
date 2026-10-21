@@ -192,12 +192,15 @@ object RideLogger {
         val authority = "${context.packageName}.fileprovider"
         val uri = FileProvider.getUriForFile(context, authority, file)
 
+        val logSnippet = try { file.readText().takeLast(4000) } catch (_: Exception) { "" }
+
         val emailIntent = Intent(Intent.ACTION_SEND).apply {
             type = "message/rfc822"
             putExtra(Intent.EXTRA_EMAIL, arrayOf("kencoppersmith@yahoo.com"))
             putExtra(Intent.EXTRA_SUBJECT, "No Hands Radio Diagnostic Ride Log")
-            putExtra(Intent.EXTRA_TEXT, "Hi Ken,\n\nAttached is my diagnostic Ride Log file for No Hands Radio.")
+            putExtra(Intent.EXTRA_TEXT, "Hi Ken,\n\nAttached is my diagnostic Ride Log file for No Hands Radio.\n\n---\nLog Snippet:\n$logSnippet")
             putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = android.content.ClipData.newRawUri("RideLog", uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
