@@ -153,10 +153,14 @@ object PlaybackRepository {
         try {
             val prefs = ctx.getSharedPreferences("music2_user_data", Context.MODE_PRIVATE)
             val jsonArray = JSONArray()
+            val skippedCats = _state.value.skippedCategoryIds
+            val skippedStats = _state.value.skippedStationIds
+
             for (cat in playlist) {
                 val catObj = JSONObject()
                 catObj.put("id", cat.id)
                 catObj.put("name", cat.name)
+                catObj.put("isSkipped", skippedCats.contains(cat.id))
 
                 val stationsArr = JSONArray()
                 for (stat in cat.stations) {
@@ -164,6 +168,7 @@ object PlaybackRepository {
                     statObj.put("id", stat.id)
                     statObj.put("name", stat.name)
                     statObj.put("streamUrl", stat.streamUrl)
+                    statObj.put("isSkipped", skippedStats.contains(stat.id))
                     stationsArr.put(statObj)
                 }
                 catObj.put("stations", stationsArr)
@@ -182,18 +187,27 @@ object PlaybackRepository {
             val jsonStr = prefs.getString("saved_playlist_json", null)
             if (!jsonStr.isNullOrBlank()) {
                 val jsonArray = JSONArray(jsonStr)
+                val restoredSkippedCats = _state.value.skippedCategoryIds.toMutableSet()
+                val restoredSkippedStats = _state.value.skippedStationIds.toMutableSet()
+
                 for (i in 0 until jsonArray.length()) {
                     val catObj = jsonArray.getJSONObject(i)
                     val catId = catObj.optString("id", "cat_$i")
                     val catName = catObj.optString("name", "Category $i")
-                    val stationsArr = catObj.optJSONArray("stations") ?: JSONArray()
+                    if (catObj.optBoolean("isSkipped", false)) {
+                        restoredSkippedCats.add(catId)
+                    }
 
+                    val stationsArr = catObj.optJSONArray("stations") ?: JSONArray()
                     val stationsList = mutableListOf<Station>()
                     for (j in 0 until stationsArr.length()) {
                         val statObj = stationsArr.getJSONObject(j)
                         val statId = statObj.optString("id", "stat_${i}_$j")
                         val statName = statObj.optString("name", "Station $j")
                         val streamUrl = statObj.optString("streamUrl", "")
+                        if (statObj.optBoolean("isSkipped", false)) {
+                            restoredSkippedStats.add(statId)
+                        }
                         if (streamUrl.isNotBlank()) {
                             stationsList.add(Station(id = statId, name = statName, streamUrl = streamUrl))
                         }
@@ -201,6 +215,13 @@ object PlaybackRepository {
                     if (stationsList.isNotEmpty()) {
                         result.add(Category(id = catId, name = catName, stations = stationsList))
                     }
+                }
+
+                _state.update { current ->
+                    current.copy(
+                        skippedCategoryIds = restoredSkippedCats,
+                        skippedStationIds = restoredSkippedStats
+                    )
                 }
             }
         } catch (e: Exception) {

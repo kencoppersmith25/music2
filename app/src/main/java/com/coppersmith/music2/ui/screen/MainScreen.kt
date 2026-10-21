@@ -5,12 +5,15 @@ import android.content.Intent
 import android.net.Uri
 import com.coppersmith.music2.R
 import com.coppersmith.music2.cast.GoogleCastIconButton
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -117,6 +120,14 @@ fun MainScreen(viewModel: MusicViewModel) {
         }
     }
 
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    BackHandler(enabled = dropdownExpanded) {
+        dropdownExpanded = false
+        focusManager.clearFocus()
+        keyboardController?.hide()
+    }
+
     // Helper to submit category search
     val onPerformCategorySearch: (String) -> Unit = { categoryName ->
         val trimmed = categoryName.trim()
@@ -126,6 +137,7 @@ fun MainScreen(viewModel: MusicViewModel) {
             categoriesListExpanded = false
             searchQuery = ""
             focusManager.clearFocus()
+            keyboardController?.hide()
             viewModel.onCategorySelected("cat_${trimmed.lowercase()}", trimmed, trimmed)
         }
     }
@@ -148,7 +160,16 @@ fun MainScreen(viewModel: MusicViewModel) {
     }
 
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            ) {
+                dropdownExpanded = false
+                focusManager.clearFocus()
+                keyboardController?.hide()
+            },
         color = bgColor
     ) {
         Column(
