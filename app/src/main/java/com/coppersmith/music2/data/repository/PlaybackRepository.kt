@@ -46,11 +46,11 @@ object PlaybackRepository {
     private var appContext: Context? = null
 
     init {
-        // Default init; MainActivity calls initRepository(context) to restore saved user categories
+        // Default init; MainActivity calls initRepository(context) to restore saved user categories and playback selection
         scope.launch(Dispatchers.IO) {
             if (playlist.isEmpty()) {
                 playlist.add(Category(id = "cat_mixed", name = "Mixed", stations = HardcodedDataSource.initialMixedStations))
-                commitState(0, 0)
+                commitState(0, 0, autoPlay = false)
             }
         }
     }
@@ -59,6 +59,7 @@ object PlaybackRepository {
         appContext = context.applicationContext
         scope.launch(Dispatchers.IO) {
             val loaded = loadPlaylistFromDisk(context.applicationContext)
+            val (savedCatIdx, savedStatIdx) = loadPlaybackSelectionFromDisk(context.applicationContext)
             mutex.withLock {
                 if (loaded.isNotEmpty()) {
                     playlist.clear()
@@ -67,8 +68,44 @@ object PlaybackRepository {
                     playlist.add(Category(id = "cat_mixed", name = "Mixed", stations = HardcodedDataSource.initialMixedStations))
                     savePlaylistToDisk(context.applicationContext)
                 }
-                commitState(0, 0)
+                // Restore saved category and station selection without blaring sound on cold launch
+                commitState(savedCatIdx, savedStatIdx, autoPlay = false)
             }
+        }
+    }
+
+    private fun savePlaybackSelectionToDisk(context: Context? = null, catIdx: Int, statIdx: Int) {
+        val ctx = context ?: appContext ?: return
+        try {
+            val prefs = ctx.getSharedPreferences("music2_user_data", Context.MODE_PRIVATE)
+            prefs.edit()
+                .putInt("saved_category_index", catIdx)
+                .putInt("saved_station_index", statIdx)
+                .apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun loadPlaybackSelectionFromDisk(context: Context): Pair<Int, Int> {
+        try {
+            val prefs = context.getSharedPreferences("music2_user_data", Context.MODE_PRIVATE)
+            val catIdx = prefs.getInt("saved_category_index", 0)
+            val statIdx = prefs.getInt("saved_station_index", 0)
+            val isLightMode = prefs.getBoolean("is_light_mode", false)
+            _state.update { it.copy(isLightMode = isLightMode) }
+            return catIdx to statIdx
+        } catch (e: Exception) {
+            return 0 to 0
+        }
+    }
+
+    fun toggleLightMode() {
+        val newMode = !_state.value.isLightMode
+        _state.update { it.copy(isLightMode = newMode) }
+        appContext?.let { ctx ->
+            ctx.getSharedPreferences("music2_user_data", Context.MODE_PRIVATE)
+                .edit().putBoolean("is_light_mode", newMode).apply()
         }
     }
 
@@ -538,7 +575,7 @@ object PlaybackRepository {
 
     private val categoryLastStationMap = mutableMapOf<Int, Int>()
 
-    private fun commitState(categoryIndex: Int, stationIndex: Int? = null) {
+    private fun commitState(categoryIndex: Int, stationIndex: Int? = null, autoPlay: Boolean = true) {
         if (playlist.isEmpty()) return
         val safeCatIdx = categoryIndex.coerceIn(0, playlist.size - 1)
         val category = playlist[safeCatIdx]
@@ -560,8 +597,12 @@ object PlaybackRepository {
         categoryLastStationMap[safeCatIdx] = safeStatIdx
         val station = category.stations[safeStatIdx]
 
-        RideLogger.log("COMMIT_STATE catIdx=$safeCatIdx statIdx=$safeStatIdx category='${category.name}' station='${station.name}'")
-        startStartupWatchdog(station)
+        savePlaybackSelectionToDisk(appContext, safeCatIdx, safeStatIdx)
+
+        RideLogger.log("COMMIT_STATE catIdx=$safeCatIdx statIdx=$safeStatIdx category='${category.name}' station='${station.name}' autoPlay=$autoPlay")
+        if (autoPlay) {
+            startStartupWatchdog(station)
+        }
 
         _state.update {
             it.copy(
@@ -569,7 +610,7 @@ object PlaybackRepository {
                 stationIndex = safeStatIdx,
                 currentCategory = category,
                 currentStation = station,
-                isPlaying = true,
+                isPlaying = autoPlay,
                 trackTitle = null,
                 artistName = null
             )

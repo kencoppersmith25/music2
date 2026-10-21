@@ -30,6 +30,7 @@ data class PlayerState(
     val stationTimeoutSeconds: Int = 8,
     val searchingCategoryName: String? = null,
     val searchError: String? = null,
+    val isLightMode: Boolean = false,
     val skippedCategoryIds: Set<String> = emptySet(),
     val skippedStationIds: Set<String> = emptySet(),
     val recentlyPlayedTracks: List<PlayedTrack> = emptyList()

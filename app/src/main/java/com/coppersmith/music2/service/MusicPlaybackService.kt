@@ -79,9 +79,11 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
             val channel = NotificationChannel(
                 "media_playback_channel",
                 "Radio Playback",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_MIN
             ).apply {
-                description = "Ongoing live radio stream notification"
+                description = "Ongoing live radio stream background service"
+                setSound(null, null)
+                enableVibration(false)
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager?.createNotificationChannel(channel)
@@ -101,7 +103,8 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                 .setOngoing(true)
                 .setContentIntent(pendingIntent)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setPriority(NotificationCompat.PRIORITY_MIN)
+                .setSilent(true)
                 .build()
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

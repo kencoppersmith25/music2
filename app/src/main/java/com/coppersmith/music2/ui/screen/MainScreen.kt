@@ -3,6 +3,8 @@ package com.coppersmith.music2.ui.screen
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import com.coppersmith.music2.R
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -17,6 +19,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -149,15 +154,16 @@ fun MainScreen(viewModel: MusicViewModel) {
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(42.dp)
+                                .clip(CircleShape)
                                 .background(Color(0xFF1E1E24), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = "2",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp
+                            Image(
+                                painter = painterResource(id = R.drawable.app_logo),
+                                contentDescription = "No Hands Radio Logo",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
                         Icon(
@@ -587,7 +593,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
                             ) {
-                                itemsIndexed(loadedCategories) { index, category ->
+                                itemsIndexed(loadedCategories, key = { _, category -> category.id }) { index, category ->
+                                    if (index !in loadedCategories.indices) return@itemsIndexed
                                     val isSelected = index == state.categoryIndex
                                     val isSkipped = state.skippedCategoryIds.contains(category.id)
                                     Row(
@@ -704,15 +711,17 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 }
                             }
                             HorizontalDivider(color = Color(0xFF2E2E38), thickness = 1.dp)
+                            val currentCatStations = state.currentCategory?.stations ?: emptyList()
                             LazyColumn(
                                 state = stationsListState,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
                             ) {
-                                itemsIndexed(state.currentCategory!!.stations) { index, station ->
+                                itemsIndexed(currentCatStations, key = { index, station -> "${station.id}_$index" }) { index, station ->
+                                    if (index !in currentCatStations.indices) return@itemsIndexed
                                     val isSelected = index == state.stationIndex
-                                    val totalStationCount = state.currentCategory!!.stations.size
+                                    val totalStationCount = currentCatStations.size
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -1463,6 +1472,23 @@ fun MainScreen(viewModel: MusicViewModel) {
                         Switch(
                             checked = state.announceCategories,
                             onCheckedChange = { viewModel.onToggleAnnounceCategories() },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFD0BCFF))
+                        )
+                    }
+
+                    // Light Mode / Dark Mode Theme toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Light Mode Theme", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Switch UI to clean light theme", color = Color.Gray, fontSize = 12.sp)
+                        }
+                        Switch(
+                            checked = state.isLightMode,
+                            onCheckedChange = { viewModel.onToggleLightMode() },
                             colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFD0BCFF))
                         )
                     }
