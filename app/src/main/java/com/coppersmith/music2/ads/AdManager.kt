@@ -85,8 +85,9 @@ object AdManager {
         }
 
         val now = SystemClock.elapsedRealtime()
+        val minInterval = if (AdConfig.IS_DEBUG) 5_000L else 120_000L
 
-        if (now - lastInterstitialShownAtMs < MIN_INTERSTITIAL_INTERVAL_MS && lastInterstitialShownAtMs != 0L) {
+        if (now - lastInterstitialShownAtMs < minInterval && lastInterstitialShownAtMs != 0L) {
             onDismissed()
             return
         }

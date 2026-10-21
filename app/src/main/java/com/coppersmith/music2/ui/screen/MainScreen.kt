@@ -148,7 +148,7 @@ fun MainScreen(viewModel: MusicViewModel) {
         "DARK" -> false
         else -> !isSystemDark
     }
-    val bgColor = if (isLight) Color(0xFFF2F2F7) else Color(0xFF121216)
+    val bgColor = if (isLight) Color(0xFFF2F2F7) else Color(0xFF000000)
 
     LaunchedEffect(isLight) {
         (context as? Activity)?.window?.let { window ->
@@ -194,7 +194,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                 ) {
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFFFFFFF) else Color(0xFF1E1E24)),
+                        colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFFFFFFF) else Color(0xFF000000)),
                         modifier = Modifier.size(54.dp)
                     ) {
                         Box(
@@ -204,7 +204,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             Image(
                                 painter = painterResource(id = R.drawable.app_logo),
                                 contentDescription = "No Hands Radio Logo",
-                                contentScale = ContentScale.Crop,
+                                contentScale = ContentScale.Fit,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
