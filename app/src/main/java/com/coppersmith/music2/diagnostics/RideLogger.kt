@@ -185,6 +185,33 @@ object RideLogger {
         })
     }
 
+    fun emailToSupport(context: Context): Result<Unit> = runCatching {
+        val file = synchronized(lock) { logFile } ?: error("No log file available.")
+        if (!file.exists()) error("Log file is empty.")
+
+        val authority = "${context.packageName}.fileprovider"
+        val uri = FileProvider.getUriForFile(context, authority, file)
+
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_EMAIL, arrayOf("kencoppersmith@yahoo.com"))
+            putExtra(Intent.EXTRA_SUBJECT, "No Hands Radio Diagnostic Ride Log")
+            putExtra(Intent.EXTRA_TEXT, "Hi Ken,\n\nAttached is my diagnostic Ride Log from No Hands Radio.")
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        context.startActivity(Intent.createChooser(intent, "Email Ride Log to Support...").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        })
+    }
+
+    fun readLogText(): String {
+        return synchronized(lock) {
+            logFile?.takeIf { it.exists() }?.readText() ?: "No log entries recorded yet."
+        }
+    }
+
     fun clearLog() {
         synchronized(lock) {
             logFile?.let { file ->

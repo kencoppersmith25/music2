@@ -188,7 +188,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 4.dp, bottom = 4.dp),
+                        .padding(top = 18.dp, bottom = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1532,6 +1532,11 @@ fun MainScreen(viewModel: MusicViewModel) {
 
     // Settings Dialog
     if (showSettingsDialog) {
+        var showExamineLogDialog by remember { mutableStateOf(false) }
+        val prefs = remember { context.getSharedPreferences("music2_user_data", android.content.Context.MODE_PRIVATE) }
+        var isRideLogUnlocked by remember { mutableStateOf(prefs.getBoolean("ride_log_unlocked", false)) }
+        var versionTapCount by remember { mutableStateOf(0) }
+
         AlertDialog(
             onDismissRequest = { showSettingsDialog = false },
             title = {
@@ -1551,23 +1556,6 @@ fun MainScreen(viewModel: MusicViewModel) {
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Continuous navigation toggle
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Continuous Auto-Play", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Auto-advance to next category when station list reaches end", color = Color.Gray, fontSize = 12.sp)
-                        }
-                        Switch(
-                            checked = state.isContinuousNav,
-                            onCheckedChange = { viewModel.onToggleContinuousNav() },
-                            colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFD0BCFF))
-                        )
-                    }
-
                     // Announce categories toggle
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1766,34 +1754,108 @@ fun MainScreen(viewModel: MusicViewModel) {
 
                     HorizontalDivider(color = Color.DarkGray)
 
-                    // App Version with Secret 5-Tap Ride Log Share
-                    var versionTapCount by remember { mutableStateOf(0) }
+                    // App Version with Secret 5-Tap Unlocking for Ride Log
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                versionTapCount++
-                                if (versionTapCount >= 5) {
-                                    versionTapCount = 0
-                                    com.coppersmith.music2.diagnostics.RideLogger.share(context)
+                                if (!isRideLogUnlocked) {
+                                    versionTapCount++
+                                    if (versionTapCount >= 5) {
+                                        prefs.edit().putBoolean("ride_log_unlocked", true).apply()
+                                        isRideLogUnlocked = true
+                                    }
                                 }
                             }
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = 4.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text("App Version 2.0.0 (Build 200)", color = Color.Gray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        if (versionTapCount in 1..4) {
-                            Text("Tap ${5 - versionTapCount} more times for Ride Log", color = Color(0xFFD0BCFF), fontSize = 11.sp)
+                        if (!isRideLogUnlocked && versionTapCount in 1..4) {
+                            Text("Tap ${5 - versionTapCount} more times to unlock Ride Log", color = Color(0xFFD0BCFF), fontSize = 11.sp)
                         }
                     }
 
-                    HorizontalDivider(color = Color.DarkGray)
-                    Text("Audio Output: ExoPlayer Live Stream Engine", color = Color.Gray, fontSize = 12.sp)
+                    // Permanently Unlocked Ride Log Tools
+                    if (isRideLogUnlocked) {
+                        HorizontalDivider(color = Color(0xFF383842))
+                        Text("Diagnostic Ride Log Tools 🛠️", color = Color(0xFFD0BCFF), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { showExamineLogDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF383842)),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Examine Log 📄", fontSize = 12.sp, color = Color.White)
+                            }
+
+                            Button(
+                                onClick = {
+                                    com.coppersmith.music2.diagnostics.RideLogger.emailToSupport(context)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C5470)),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Email Log ✉️", fontSize = 12.sp, color = Color.White)
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {},
             containerColor = Color(0xFF1E1E24)
         )
+
+        // Examine Ride Log Dialog
+        if (showExamineLogDialog) {
+            val logContent = remember { com.coppersmith.music2.diagnostics.RideLogger.readLogText() }
+            AlertDialog(
+                onDismissRequest = { showExamineLogDialog = false },
+                title = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Examine Ride Log", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        IconButton(onClick = { showExamineLogDialog = false }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                        }
+                    }
+                },
+                text = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(280.dp)
+                            .background(Color(0xFF121216), shape = RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = logContent,
+                            color = Color.LightGray,
+                            fontSize = 10.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { com.coppersmith.music2.diagnostics.RideLogger.emailToSupport(context) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C5470)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Email to kencoppersmith@yahoo.com ✉️", color = Color.White, fontSize = 12.sp)
+                    }
+                },
+                containerColor = Color(0xFF1E1E24)
+            )
+        }
     }
 
     // Cast Dialog

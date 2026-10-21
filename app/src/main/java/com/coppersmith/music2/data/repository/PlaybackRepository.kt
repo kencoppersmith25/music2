@@ -306,16 +306,15 @@ object PlaybackRepository {
 
     fun toggleCategorySkipped(categoryIndex: Int) {
         val category = playlist.getOrNull(categoryIndex) ?: return
-        _state.update { current ->
-            val set = current.skippedCategoryIds.toMutableSet()
-            if (set.contains(category.id)) {
-                set.remove(category.id)
-            } else {
-                set.add(category.id)
-            }
-            current.copy(skippedCategoryIds = set)
+        val currentSet = _state.value.skippedCategoryIds.toMutableSet()
+        if (currentSet.contains(category.id)) {
+            currentSet.remove(category.id)
+        } else {
+            currentSet.add(category.id)
         }
+        _state.update { it.copy(skippedCategoryIds = currentSet) }
         savePlaybackSelectionToDisk(appContext, _state.value.categoryIndex, _state.value.stationIndex)
+        savePlaylistToDisk(appContext)
     }
 
     private fun commitState(categoryIndex: Int, stationIndex: Int) {
@@ -538,16 +537,15 @@ object PlaybackRepository {
     }
 
     fun toggleStationSkipped(stationId: String) {
-        _state.update { current ->
-            val set = current.skippedStationIds.toMutableSet()
-            if (set.contains(stationId)) {
-                set.remove(stationId)
-            } else {
-                set.add(stationId)
-            }
-            current.copy(skippedStationIds = set)
+        val currentSet = _state.value.skippedStationIds.toMutableSet()
+        if (currentSet.contains(stationId)) {
+            currentSet.remove(stationId)
+        } else {
+            currentSet.add(stationId)
         }
+        _state.update { it.copy(skippedStationIds = currentSet) }
         savePlaybackSelectionToDisk(appContext, _state.value.categoryIndex, _state.value.stationIndex)
+        savePlaylistToDisk(appContext)
     }
 
     fun nextStation() {
