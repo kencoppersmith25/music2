@@ -96,7 +96,7 @@ object PlaybackRepository {
             val prefs = context.getSharedPreferences("music2_user_data", Context.MODE_PRIVATE)
             val catIdx = prefs.getInt("saved_category_index", 0)
             val statIdx = prefs.getInt("saved_station_index", 0)
-            val themeMode = prefs.getString("saved_theme_mode", "DARK") ?: "DARK"
+            val themeMode = prefs.getString("saved_theme_mode", "AUTO") ?: "AUTO"
             _state.update { it.copy(themeMode = themeMode, isLightMode = (themeMode == "LIGHT")) }
             return catIdx to statIdx
         } catch (e: Exception) {

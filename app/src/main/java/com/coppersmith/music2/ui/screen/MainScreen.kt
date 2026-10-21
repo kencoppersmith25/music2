@@ -11,6 +11,7 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -136,6 +137,15 @@ fun MainScreen(viewModel: MusicViewModel) {
         else -> !isSystemDark
     }
     val bgColor = if (isLight) Color(0xFFF2F2F7) else Color(0xFF121216)
+
+    LaunchedEffect(isLight) {
+        (context as? Activity)?.window?.let { window ->
+            androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+                isAppearanceLightStatusBars = isLight
+                isAppearanceLightNavigationBars = isLight
+            }
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -1432,7 +1442,10 @@ fun MainScreen(viewModel: MusicViewModel) {
                 }
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                     // Continuous navigation toggle
                     Row(
                         modifier = Modifier.fillMaxWidth(),

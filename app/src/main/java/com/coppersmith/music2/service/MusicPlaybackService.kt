@@ -30,9 +30,12 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
+import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.google.common.collect.ImmutableList
 import com.coppersmith.music2.data.repository.PlaybackRepository
 import com.coppersmith.music2.diagnostics.RideLogger
 import android.speech.tts.TextToSpeech
@@ -312,14 +315,30 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         createNotificationChannel()
 
         try {
-            setMediaNotificationProvider(
-                DefaultMediaNotificationProvider.Builder(this)
-                    .setChannelId("media_playback_channel")
-                    .setNotificationId(1001)
-                    .build()
-            )
+            setMediaNotificationProvider(object : MediaNotification.Provider {
+                override fun createNotification(
+                    mediaSession: MediaSession,
+                    customLayout: ImmutableList<CommandButton>,
+                    actionFactory: MediaNotification.ActionFactory,
+                    onNotificationChangedListener: MediaNotification.Provider.Callback
+                ): MediaNotification {
+                    val notification = NotificationCompat.Builder(this@MusicPlaybackService, "media_playback_channel")
+                        .setSmallIcon(R.mipmap.ic_launcher)
+                        .setPriority(NotificationCompat.PRIORITY_MIN)
+                        .setSilent(true)
+                        .setOngoing(true)
+                        .build()
+                    return MediaNotification(1001, notification)
+                }
+
+                override fun handleCustomCommand(
+                    session: MediaSession,
+                    action: String,
+                    extras: android.os.Bundle
+                ): Boolean = false
+            })
         } catch (e: Exception) {
-            Log.e("MusicPlaybackService", "Error setting MediaNotificationProvider: ${e.message}")
+            Log.e("MusicPlaybackService", "Error setting silent MediaNotificationProvider: ${e.message}")
         }
 
         promoteToForeground()
