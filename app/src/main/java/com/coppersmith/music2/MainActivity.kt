@@ -5,9 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
 import androidx.core.content.ContextCompat
@@ -15,7 +14,7 @@ import com.coppersmith.music2.service.MusicPlaybackService
 import com.coppersmith.music2.ui.MusicViewModel
 import com.coppersmith.music2.ui.screen.MainScreen
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private val viewModel: MusicViewModel by viewModels()
 

@@ -66,7 +66,12 @@ object PlaybackRepository {
                 if (loaded.isNotEmpty()) {
                     playlist.clear()
                     playlist.addAll(loaded)
-                } else if (playlist.isEmpty()) {
+                }
+                // Ensure Mixed category is always present at position 0
+                if (playlist.none { it.id == "cat_mixed" || it.name.equals("Mixed", ignoreCase = true) }) {
+                    playlist.add(0, Category(id = "cat_mixed", name = "Mixed", stations = HardcodedDataSource.initialMixedStations))
+                }
+                if (playlist.isEmpty()) {
                     playlist.add(Category(id = "cat_mixed", name = "Mixed", stations = HardcodedDataSource.initialMixedStations))
                     savePlaylistToDisk(context.applicationContext)
                 }
@@ -82,9 +87,13 @@ object PlaybackRepository {
         val ctx = context ?: appContext ?: return
         try {
             val prefs = ctx.getSharedPreferences("music2_user_data", Context.MODE_PRIVATE)
+            val skippedCatsJson = JSONArray(_state.value.skippedCategoryIds).toString()
+            val skippedStatsJson = JSONArray(_state.value.skippedStationIds).toString()
             prefs.edit()
                 .putInt("saved_category_index", catIdx)
                 .putInt("saved_station_index", statIdx)
+                .putString("saved_skipped_cats", skippedCatsJson)
+                .putString("saved_skipped_stats", skippedStatsJson)
                 .apply()
         } catch (e: Exception) {
             e.printStackTrace()
@@ -97,7 +106,29 @@ object PlaybackRepository {
             val catIdx = prefs.getInt("saved_category_index", 0)
             val statIdx = prefs.getInt("saved_station_index", 0)
             val themeMode = prefs.getString("saved_theme_mode", "AUTO") ?: "AUTO"
-            _state.update { it.copy(themeMode = themeMode, isLightMode = (themeMode == "LIGHT")) }
+
+            val skippedCatsSet = mutableSetOf<String>()
+            val skippedCatsJson = prefs.getString("saved_skipped_cats", null)
+            if (!skippedCatsJson.isNullOrBlank()) {
+                val arr = JSONArray(skippedCatsJson)
+                for (i in 0 until arr.length()) skippedCatsSet.add(arr.getString(i))
+            }
+
+            val skippedStatsSet = mutableSetOf<String>()
+            val skippedStatsJson = prefs.getString("saved_skipped_stats", null)
+            if (!skippedStatsJson.isNullOrBlank()) {
+                val arr = JSONArray(skippedStatsJson)
+                for (i in 0 until arr.length()) skippedStatsSet.add(arr.getString(i))
+            }
+
+            _state.update {
+                it.copy(
+                    themeMode = themeMode,
+                    isLightMode = (themeMode == "LIGHT"),
+                    skippedCategoryIds = skippedCatsSet,
+                    skippedStationIds = skippedStatsSet
+                )
+            }
             return catIdx to statIdx
         } catch (e: Exception) {
             return 0 to 0
@@ -258,6 +289,7 @@ object PlaybackRepository {
             }
             current.copy(skippedCategoryIds = set)
         }
+        savePlaybackSelectionToDisk(appContext, _state.value.categoryIndex, _state.value.stationIndex)
     }
 
     private fun commitState(categoryIndex: Int, stationIndex: Int) {
@@ -489,6 +521,7 @@ object PlaybackRepository {
             }
             current.copy(skippedStationIds = set)
         }
+        savePlaybackSelectionToDisk(appContext, _state.value.categoryIndex, _state.value.stationIndex)
     }
 
     fun nextStation() {
@@ -862,7 +895,7 @@ object PlaybackRepository {
             val fallbackQuery = cleanTitle ?: cleanArtist ?: stationName ?: "Music Radio"
             return@withContext TrackInfoResult(
                 title = fallbackQuery,
-                description = "No detailed Wikipedia summary found automatically for '$fallbackQuery'. Tap below to search directly on Google for recordings, score history, and composer details.",
+                description = "No detailed Wikipedia summary found automatically for '$fallbackQuery'. Tap above to search directly on Google for recordings, score history, and composer details.",
                 wikiUrl = null,
                 query = fallbackQuery
             )

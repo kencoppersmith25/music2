@@ -173,15 +173,18 @@ fun MainScreen(viewModel: MusicViewModel) {
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(64.dp)
-                            .background(Color.Transparent),
+                            .size(60.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isLight) Color(0xFFFFFFFF) else Color(0xFF1E1E24)),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.app_logo),
                             contentDescription = "No Hands Radio Logo",
                             contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(16.dp))
                         )
                     }
 
@@ -446,7 +449,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                     fontSize = 15.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.basicMarquee()
+                                    modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
                                 )
 
                                 if (!state.isLoading) {
@@ -820,7 +823,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.basicMarquee()
+                            modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
                         )
 
                         // Music / Song Title with Auto-Marquee
@@ -831,7 +834,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             fontSize = 13.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.basicMarquee()
+                            modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
                         )
 
                         // Musician / Singer / Artist with Auto-Marquee
@@ -842,7 +845,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             fontSize = 13.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.basicMarquee()
+                            modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
                         )
                     }
 
