@@ -243,6 +243,11 @@ object PlaybackRepository {
         _state.update { it.copy(stationTimeoutSeconds = safeSeconds) }
     }
 
+    fun setWhilePlayingTimeoutSeconds(seconds: Int) {
+        val safeSeconds = seconds.coerceIn(2, 300)
+        _state.update { it.copy(whilePlayingTimeoutSeconds = safeSeconds) }
+    }
+
     fun setLoading(loading: Boolean) {
         _state.update { it.copy(isLoading = loading) }
     }

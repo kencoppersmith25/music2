@@ -1641,16 +1641,15 @@ fun MainScreen(viewModel: MusicViewModel) {
 
                     HorizontalDivider(color = Color.DarkGray)
 
-                    // Bluetooth Headset Back Button Action
+                    // Bluetooth Headset Previous Button Action
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Bluetooth Headset Back Button", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Choose action when back button is pressed on Bluetooth headset:", color = Color.Gray, fontSize = 12.sp)
+                        Text("Bluetooth Headset Previous Button", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
 
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { viewModel.onSetBluetoothBackAction("NEXT_CATEGORY") }
-                                .padding(vertical = 4.dp),
+                                .padding(vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
@@ -1659,17 +1658,14 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFD0BCFF))
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text("Next Category (Default)", color = Color.White, fontSize = 14.sp)
-                                Text("Allows browsing all categories and stations with 2 buttons", color = Color.Gray, fontSize = 11.sp)
-                            }
+                            Text("Next Category (Default)", color = Color.White, fontSize = 14.sp)
                         }
 
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { viewModel.onSetBluetoothBackAction("PREVIOUS_STATION") }
-                                .padding(vertical = 4.dp),
+                                .padding(vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
@@ -1678,19 +1674,15 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFD0BCFF))
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text("Previous Station", color = Color.White, fontSize = 14.sp)
-                                Text("Standard previous station behavior", color = Color.Gray, fontSize = 11.sp)
-                            }
+                            Text("Previous Station", color = Color.White, fontSize = 14.sp)
                         }
                     }
 
                     HorizontalDivider(color = Color.DarkGray)
 
-                    // Default Search Stations Limit
+                    // Search Station Limit
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("Search Station Limit", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Maximum stations fetched per search category: ${state.searchResultLimit}", color = Color.Gray, fontSize = 12.sp)
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1698,13 +1690,16 @@ fun MainScreen(viewModel: MusicViewModel) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             listOf(20, 30, 50, 75, 100).forEach { limitVal ->
+                                val isSelected = state.searchResultLimit == limitVal
                                 FilterChip(
-                                    selected = state.searchResultLimit == limitVal,
+                                    selected = isSelected,
                                     onClick = { viewModel.onSetSearchResultLimit(limitVal) },
-                                    label = { Text("$limitVal", fontSize = 12.sp) },
+                                    label = { Text("$limitVal", fontSize = 12.sp, color = if (isSelected) Color.Black else Color.White) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = Color(0xFFD0BCFF),
-                                        selectedLabelColor = Color.Black
+                                        selectedLabelColor = Color.Black,
+                                        containerColor = Color(0xFF2E2E38),
+                                        labelColor = Color.White
                                     )
                                 )
                             }
@@ -1716,7 +1711,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                     // Station Startup Timeout
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("Station Startup Timeout", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Auto-advance to next station if sound doesn't start in: ${state.stationTimeoutSeconds}s", color = Color.Gray, fontSize = 12.sp)
+                        Text("Wait time when starting a new station: ${state.stationTimeoutSeconds}s", color = Color.Gray, fontSize = 12.sp)
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1724,13 +1719,16 @@ fun MainScreen(viewModel: MusicViewModel) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             listOf(2 to "2s", 5 to "5s", 8 to "8s", 10 to "10s", 15 to "15s", 30 to "30s").forEach { (sec, labelText) ->
+                                val isSelected = state.stationTimeoutSeconds == sec
                                 FilterChip(
-                                    selected = state.stationTimeoutSeconds == sec,
+                                    selected = isSelected,
                                     onClick = { viewModel.onSetStationTimeoutSeconds(sec) },
-                                    label = { Text(labelText, fontSize = 11.sp) },
+                                    label = { Text(labelText, fontSize = 11.sp, color = if (isSelected) Color.Black else Color.White) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = Color(0xFFD0BCFF),
-                                        selectedLabelColor = Color.Black
+                                        selectedLabelColor = Color.Black,
+                                        containerColor = Color(0xFF2E2E38),
+                                        labelColor = Color.White
                                     )
                                 )
                             }
@@ -1739,17 +1737,54 @@ fun MainScreen(viewModel: MusicViewModel) {
 
                     HorizontalDivider(color = Color.DarkGray)
 
-                    // RideLogger Diagnostic Export Button
-                    Button(
-                        onClick = {
-                            com.coppersmith.music2.diagnostics.RideLogger.share(context)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF383842)),
-                        modifier = Modifier.fillMaxWidth()
+                    // While-Playing Dropout Timeout
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("While-Playing Stream Dropout Timeout", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Wait time if stream drops while playing: ${state.whilePlayingTimeoutSeconds}s", color = Color.Gray, fontSize = 12.sp)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            listOf(2 to "2s", 5 to "5s", 8 to "8s", 10 to "10s", 15 to "15s", 30 to "30s").forEach { (sec, labelText) ->
+                                val isSelected = state.whilePlayingTimeoutSeconds == sec
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { viewModel.onSetWhilePlayingTimeoutSeconds(sec) },
+                                    label = { Text(labelText, fontSize = 11.sp, color = if (isSelected) Color.Black else Color.White) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Color(0xFFD0BCFF),
+                                        selectedLabelColor = Color.Black,
+                                        containerColor = Color(0xFF2E2E38),
+                                        labelColor = Color.White
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = Color.DarkGray)
+
+                    // App Version with Secret 5-Tap Ride Log Share
+                    var versionTapCount by remember { mutableStateOf(0) }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                versionTapCount++
+                                if (versionTapCount >= 5) {
+                                    versionTapCount = 0
+                                    com.coppersmith.music2.diagnostics.RideLogger.share(context)
+                                }
+                            }
+                            .padding(vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Export / Share Diagnostic Ride Log 📄", color = Color.White, fontSize = 13.sp)
+                        Text("App Version 2.0.0 (Build 200)", color = Color.Gray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        if (versionTapCount in 1..4) {
+                            Text("Tap ${5 - versionTapCount} more times for Ride Log", color = Color(0xFFD0BCFF), fontSize = 11.sp)
+                        }
                     }
 
                     HorizontalDivider(color = Color.DarkGray)

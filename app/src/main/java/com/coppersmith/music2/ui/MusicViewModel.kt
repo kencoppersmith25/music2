@@ -110,6 +110,10 @@ class MusicViewModel : ViewModel() {
         repository.setStationTimeoutSeconds(seconds)
     }
 
+    fun onSetWhilePlayingTimeoutSeconds(seconds: Int) {
+        repository.setWhilePlayingTimeoutSeconds(seconds)
+    }
+
     fun onClearSearchError() {
         repository.clearSearchError()
     }

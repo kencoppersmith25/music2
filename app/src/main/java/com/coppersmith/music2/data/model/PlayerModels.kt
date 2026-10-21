@@ -28,6 +28,7 @@ data class PlayerState(
     val bluetoothBackAction: String = "NEXT_CATEGORY",
     val searchResultLimit: Int = 50,
     val stationTimeoutSeconds: Int = 5,
+    val whilePlayingTimeoutSeconds: Int = 10,
     val searchingCategoryName: String? = null,
     val searchError: String? = null,
     val isLightMode: Boolean = false,
