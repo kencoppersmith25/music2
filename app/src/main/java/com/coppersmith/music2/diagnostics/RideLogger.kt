@@ -13,6 +13,7 @@ import java.io.File
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -228,44 +229,43 @@ object RideLogger {
         val deviceModel = "${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})"
 
         CoroutineScope(Dispatchers.IO).launch {
+            var sentViaHttp = false
             try {
                 val url = URL("https://formsubmit.co/ajax/kencoppersmith@yahoo.com")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
-                conn.setRequestProperty("Content-Type", "application/json")
-                conn.setRequestProperty("Accept", "application/json")
+                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
                 conn.setRequestProperty("User-Agent", "NoHandsRadio/2.0 Android")
                 conn.connectTimeout = 8000
                 conn.readTimeout = 8000
                 conn.doOutput = true
 
-                val jsonPayload = JSONObject().apply {
-                    put("_subject", "No Hands Radio Diagnostic Ride Log - $timestamp")
-                    put("_template", "table")
-                    put("_captcha", "false")
-                    put("device", deviceModel)
-                    put("timestamp", timestamp)
-                    put("ride_log", logText.takeLast(10000))
-                }
+                val postData = StringBuilder()
+                    .append("_subject=").append(URLEncoder.encode("No Hands Radio Ride Log - $timestamp", "UTF-8"))
+                    .append("&_captcha=").append(URLEncoder.encode("false", "UTF-8"))
+                    .append("&device=").append(URLEncoder.encode(deviceModel, "UTF-8"))
+                    .append("&timestamp=").append(URLEncoder.encode(timestamp, "UTF-8"))
+                    .append("&ride_log=").append(URLEncoder.encode(logText.takeLast(8000), "UTF-8"))
+                    .toString()
 
                 conn.outputStream.use { os ->
-                    os.write(jsonPayload.toString().toByteArray(Charsets.UTF_8))
+                    os.write(postData.toByteArray(Charsets.UTF_8))
                 }
 
                 val responseCode = conn.responseCode
                 if (responseCode == 200) {
-                    withContext(Dispatchers.Main) {
-                        onResult(true, "Log sent successfully to kencoppersmith@yahoo.com! ✉️")
-                    }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        emailToSupport(context)
-                        onResult(true, "Opening email app to send log...")
+                    val respText = conn.inputStream.bufferedReader().use { it.readText() }
+                    if (respText.contains("true") || respText.contains("success")) {
+                        sentViaHttp = true
                     }
                 }
                 conn.disconnect()
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
+            } catch (_: Exception) {}
+
+            withContext(Dispatchers.Main) {
+                if (sentViaHttp) {
+                    onResult(true, "Log transmitted! ✉️ (If 1st time, check kencoppersmith@yahoo.com inbox/spam for FormSubmit activation click)")
+                } else {
                     emailToSupport(context)
                     onResult(true, "Opening email app to send log...")
                 }
