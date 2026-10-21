@@ -909,14 +909,21 @@ object PlaybackRepository {
             for (q in queriesToTry) {
                 val res = queryWikipediaSummary(q)
                 if (res != null) {
-                    return@withContext res
+                    return@withContext res.copy(
+                        composerQuery = cleanArtist,
+                        pieceQuery = cleanTitle,
+                        stationQuery = stationName
+                    )
                 }
             }
 
             val fallbackQuery = cleanTitle ?: cleanArtist ?: stationName ?: "Music Radio"
             return@withContext TrackInfoResult(
                 title = fallbackQuery,
-                description = "No detailed Wikipedia summary found automatically for '$fallbackQuery'. Tap above to search directly on Google for recordings, score history, and composer details.",
+                description = "No detailed Wikipedia summary found automatically for '$fallbackQuery'. Tap search chips below to search directly on Google for recordings, score history, composer details, and station info.",
+                composerQuery = cleanArtist,
+                pieceQuery = cleanTitle,
+                stationQuery = stationName,
                 wikiUrl = null,
                 query = fallbackQuery
             )

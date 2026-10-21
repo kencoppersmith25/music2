@@ -192,21 +192,22 @@ fun MainScreen(viewModel: MusicViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(60.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(bgColor),
-                        contentAlignment = Alignment.Center
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFFFFFFF) else Color(0xFF1E1E24)),
+                        modifier = Modifier.size(54.dp)
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.app_logo),
-                            contentDescription = "No Hands Radio Logo",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(16.dp))
-                        )
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.app_logo),
+                                contentDescription = "No Hands Radio Logo",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
 
                     Row(
@@ -972,15 +973,15 @@ fun MainScreen(viewModel: MusicViewModel) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 80.dp, max = 130.dp),
+                    .heightIn(min = 100.dp, max = 220.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1B22))
+                colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFFFFFFF) else Color(0xFF1B1B22))
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     val searchQuery = autoTrackInfo?.query ?: "${state.artistName ?: ""} ${state.trackTitle ?: ""}".trim()
 
@@ -990,7 +991,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Composer & History Info 📖",
+                            text = "Composer & Piece Information 📖",
                             color = Color(0xFFD0BCFF),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
@@ -1011,6 +1012,54 @@ fun MainScreen(viewModel: MusicViewModel) {
                             Box(modifier = Modifier.padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
                                 Text("Search Google 🔍", color = Color(0xFFD0BCFF), fontSize = 11.sp, fontWeight = FontWeight.Medium)
                             }
+                        }
+                    }
+
+                    // Interactive Google Search Chips for Composer, Piece, and Station
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val composer = autoTrackInfo?.composerQuery ?: state.artistName
+                        if (!composer.isNullOrBlank() && composer != "Live Radio Stream") {
+                            FilterChip(
+                                selected = false,
+                                onClick = {
+                                    val url = "https://www.google.com/search?q=" + URLEncoder.encode(composer, "UTF-8")
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                },
+                                label = { Text("🔍 Composer: $composer", fontSize = 11.sp, color = Color(0xFFD0BCFF)) },
+                                colors = FilterChipDefaults.filterChipColors(containerColor = Color(0xFF2E2E38))
+                            )
+                        }
+
+                        val piece = autoTrackInfo?.pieceQuery ?: state.trackTitle
+                        if (!piece.isNullOrBlank()) {
+                            FilterChip(
+                                selected = false,
+                                onClick = {
+                                    val url = "https://www.google.com/search?q=" + URLEncoder.encode(piece, "UTF-8")
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                },
+                                label = { Text("🎵 Piece: $piece", fontSize = 11.sp, color = Color(0xFFD0BCFF)) },
+                                colors = FilterChipDefaults.filterChipColors(containerColor = Color(0xFF2E2E38))
+                            )
+                        }
+
+                        val station = autoTrackInfo?.stationQuery ?: state.currentStation?.name
+                        if (!station.isNullOrBlank()) {
+                            FilterChip(
+                                selected = false,
+                                onClick = {
+                                    val url = "https://www.google.com/search?q=" + URLEncoder.encode("$station radio station", "UTF-8")
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                },
+                                label = { Text("📻 Station: $station", fontSize = 11.sp, color = Color(0xFFD0BCFF)) },
+                                colors = FilterChipDefaults.filterChipColors(containerColor = Color(0xFF2E2E38))
+                            )
                         }
                     }
 
@@ -1036,7 +1085,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 item {
                                     Text(
                                         text = info.description,
-                                        color = Color.LightGray,
+                                        color = if (isLight) Color(0xFF2C2C2E) else Color.LightGray,
                                         fontSize = 12.sp,
                                         lineHeight = 16.sp
                                     )
@@ -1044,7 +1093,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             }
                         } else {
                             Text(
-                                text = "No automatic summary found for '$searchQuery'. Tap 'Search Google 🔍' above for recordings and composer details.",
+                                text = "No automatic summary found for '$searchQuery'. Tap Google Search chips above for recordings and composer details.",
                                 color = Color.Gray,
                                 fontSize = 12.sp
                             )

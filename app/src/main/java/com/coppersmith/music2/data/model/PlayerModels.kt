@@ -48,6 +48,9 @@ data class PlayedTrack(
 data class TrackInfoResult(
     val title: String,
     val description: String,
+    val composerQuery: String? = null,
+    val pieceQuery: String? = null,
+    val stationQuery: String? = null,
     val wikiUrl: String? = null,
     val query: String
 )
