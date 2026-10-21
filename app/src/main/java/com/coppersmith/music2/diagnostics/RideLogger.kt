@@ -11,10 +11,17 @@ import androidx.core.content.FileProvider
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import org.json.JSONObject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 object RideLogger {
 
@@ -207,6 +214,63 @@ object RideLogger {
         context.startActivity(Intent.createChooser(emailIntent, "Send Ride Log via Email...").apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         })
+    }
+
+    fun emailToSupportDirect(context: Context, onResult: (Boolean, String) -> Unit) {
+        val file = synchronized(lock) { logFile }
+        if (file == null || !file.exists() || file.length() == 0L) {
+            onResult(false, "Ride log is empty.")
+            return
+        }
+
+        val logText = file.readText()
+        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+        val deviceModel = "${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})"
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val url = URL("https://formsubmit.co/ajax/kencoppersmith@yahoo.com")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.setRequestProperty("Accept", "application/json")
+                conn.setRequestProperty("User-Agent", "NoHandsRadio/2.0 Android")
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                conn.doOutput = true
+
+                val jsonPayload = JSONObject().apply {
+                    put("_subject", "No Hands Radio Diagnostic Ride Log - $timestamp")
+                    put("_template", "table")
+                    put("_captcha", "false")
+                    put("device", deviceModel)
+                    put("timestamp", timestamp)
+                    put("ride_log", logText.takeLast(10000))
+                }
+
+                conn.outputStream.use { os ->
+                    os.write(jsonPayload.toString().toByteArray(Charsets.UTF_8))
+                }
+
+                val responseCode = conn.responseCode
+                if (responseCode == 200) {
+                    withContext(Dispatchers.Main) {
+                        onResult(true, "Log sent successfully to kencoppersmith@yahoo.com! ✉️")
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        emailToSupport(context)
+                        onResult(true, "Opening email app to send log...")
+                    }
+                }
+                conn.disconnect()
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    emailToSupport(context)
+                    onResult(true, "Opening email app to send log...")
+                }
+            }
+        }
     }
 
     fun readLogText(): String {

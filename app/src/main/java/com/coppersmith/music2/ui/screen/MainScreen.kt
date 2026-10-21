@@ -1810,8 +1810,10 @@ fun MainScreen(viewModel: MusicViewModel) {
 
                             Button(
                                 onClick = {
-                                    com.coppersmith.music2.diagnostics.RideLogger.emailToSupport(context)
-                                    android.widget.Toast.makeText(context, "Opening email app... Please tap 'SEND' to transmit log to kencoppersmith@yahoo.com", android.widget.Toast.LENGTH_LONG).show()
+                                    android.widget.Toast.makeText(context, "Sending Ride Log to kencoppersmith@yahoo.com...", android.widget.Toast.LENGTH_SHORT).show()
+                                    com.coppersmith.music2.diagnostics.RideLogger.emailToSupportDirect(context) { _, msg ->
+                                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                                    }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C5470)),
                                 modifier = Modifier.fillMaxWidth()
