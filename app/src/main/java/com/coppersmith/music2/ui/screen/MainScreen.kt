@@ -486,8 +486,11 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 modifier = Modifier
                                     .weight(1f)
                                     .clickable {
+                                        dropdownExpanded = false
                                         categoriesListExpanded = !categoriesListExpanded
                                         stationsListExpanded = false
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
                                     }
                             ) {
                                 val categoryTitle = when {
@@ -1781,26 +1784,27 @@ fun MainScreen(viewModel: MusicViewModel) {
                         HorizontalDivider(color = Color(0xFF383842))
                         Text("Diagnostic Ride Log Tools 🛠️", color = Color(0xFFD0BCFF), fontSize = 13.sp, fontWeight = FontWeight.Bold)
 
-                        Row(
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Button(
                                 onClick = { showExamineLogDialog = true },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF383842)),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Examine Log 📄", fontSize = 12.sp, color = Color.White)
+                                Text("Examine Log 📄", fontSize = 13.sp, color = Color.White)
                             }
 
                             Button(
                                 onClick = {
                                     com.coppersmith.music2.diagnostics.RideLogger.emailToSupport(context)
+                                    android.widget.Toast.makeText(context, "Log sent to developer", android.widget.Toast.LENGTH_LONG).show()
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C5470)),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Email Log ✉️", fontSize = 12.sp, color = Color.White)
+                                Text("Email Log to Developer ✉️", fontSize = 13.sp, color = Color.White)
                             }
                         }
                     }
@@ -1810,7 +1814,7 @@ fun MainScreen(viewModel: MusicViewModel) {
             containerColor = Color(0xFF1E1E24)
         )
 
-        // Examine Ride Log Dialog
+        // Large Examine Ride Log Dialog
         if (showExamineLogDialog) {
             val logContent = remember { com.coppersmith.music2.diagnostics.RideLogger.readLogText() }
             AlertDialog(
@@ -1831,7 +1835,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(280.dp)
+                            .height(340.dp)
                             .background(Color(0xFF121216), shape = RoundedCornerShape(8.dp))
                             .padding(8.dp)
                             .verticalScroll(rememberScrollState())
@@ -1839,18 +1843,18 @@ fun MainScreen(viewModel: MusicViewModel) {
                         Text(
                             text = logContent,
                             color = Color.LightGray,
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                         )
                     }
                 },
                 confirmButton = {
                     Button(
-                        onClick = { com.coppersmith.music2.diagnostics.RideLogger.emailToSupport(context) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C5470)),
+                        onClick = { showExamineLogDialog = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF383842)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Email to kencoppersmith@yahoo.com ✉️", color = Color.White, fontSize = 12.sp)
+                        Text("Close", color = Color.White, fontSize = 13.sp)
                     }
                 },
                 containerColor = Color(0xFF1E1E24)

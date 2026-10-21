@@ -350,9 +350,9 @@ object PlaybackRepository {
         try {
             val encodedTag = URLEncoder.encode(term.trim(), "UTF-8")
             val urlString = if (field == "byname") {
-                "$baseUrl/json/stations/byname/$encodedTag?limit=$limit"
+                "$baseUrl/json/stations/byname/$encodedTag?limit=$limit&hidebroken=true&lastcheckok=1"
             } else {
-                "$baseUrl/json/stations/search?$field=$encodedTag&limit=$limit&order=votes&reverse=true"
+                "$baseUrl/json/stations/search?$field=$encodedTag&limit=$limit&order=votes&reverse=true&hidebroken=true&lastcheckok=1"
             }
             val url = URL(urlString)
             val connection = url.openConnection() as HttpURLConnection
