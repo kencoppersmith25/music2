@@ -102,7 +102,7 @@ fun MainScreen(viewModel: MusicViewModel) {
     val state by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
 
-    val loadedCategories = viewModel.onGetAllCategories()
+    val loadedCategories = viewModel.onGetAllCategories().toList()
     val totalCategories = loadedCategories.size.coerceAtLeast(1)
     val currentCategoryNum = (state.categoryIndex + 1).coerceAtLeast(1)
     val currentCategoryName = state.currentCategory?.name ?: "Mixed"
@@ -618,10 +618,12 @@ fun MainScreen(viewModel: MusicViewModel) {
                 // Dropdown of ALL Categories when category title on left is clicked
                 if (categoriesListExpanded && loadedCategories.isNotEmpty()) {
                     val categoriesListState = rememberLazyListState()
-                    LaunchedEffect(categoriesListExpanded, state.categoryIndex) {
-                        if (categoriesListExpanded && state.categoryIndex in loadedCategories.indices) {
-                            categoriesListState.scrollToItem(state.categoryIndex)
-                        }
+                    LaunchedEffect(categoriesListExpanded, state.categoryIndex, loadedCategories.size) {
+                        try {
+                            if (categoriesListExpanded && state.categoryIndex in loadedCategories.indices) {
+                                categoriesListState.scrollToItem(state.categoryIndex)
+                            }
+                        } catch (_: Exception) {}
                     }
 
                     Card(
@@ -724,11 +726,13 @@ fun MainScreen(viewModel: MusicViewModel) {
                 // Dropdown of stations in folder/category when list icon is clicked
                 if (stationsListExpanded && (state.currentCategory?.stations?.isNotEmpty() == true)) {
                     val stationsListState = rememberLazyListState()
-                    LaunchedEffect(stationsListExpanded, state.stationIndex) {
-                        val currentStations = state.currentCategory?.stations
-                        if (stationsListExpanded && currentStations != null && state.stationIndex in currentStations.indices) {
-                            stationsListState.scrollToItem(state.stationIndex)
-                        }
+                    LaunchedEffect(stationsListExpanded, state.stationIndex, state.currentCategory?.stations?.size) {
+                        try {
+                            val currentStations = state.currentCategory?.stations
+                            if (stationsListExpanded && currentStations != null && state.stationIndex in currentStations.indices) {
+                                stationsListState.scrollToItem(state.stationIndex)
+                            }
+                        } catch (_: Exception) {}
                     }
 
                     Card(
