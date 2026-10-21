@@ -58,6 +58,7 @@ object PlaybackRepository {
 
     fun initRepository(context: Context) {
         appContext = context.applicationContext
+        if (_state.value.currentCategory != null) return
         scope.launch(Dispatchers.IO) {
             val loaded = loadPlaylistFromDisk(context.applicationContext)
             val (savedCatIdx, savedStatIdx) = loadPlaybackSelectionFromDisk(context.applicationContext)
@@ -70,7 +71,9 @@ object PlaybackRepository {
                     savePlaylistToDisk(context.applicationContext)
                 }
                 // Restore saved category and station selection without blaring sound on cold launch
-                commitState(savedCatIdx, savedStatIdx, autoPlay = false)
+                if (_state.value.currentCategory == null) {
+                    commitState(savedCatIdx, savedStatIdx, autoPlay = false)
+                }
             }
         }
     }

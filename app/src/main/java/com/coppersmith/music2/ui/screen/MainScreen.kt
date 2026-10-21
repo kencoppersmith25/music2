@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import com.coppersmith.music2.R
+import com.coppersmith.music2.cast.GoogleCastIconButton
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -90,6 +91,7 @@ fun MainScreen(viewModel: MusicViewModel) {
     var showTrackInfoDialog by remember { mutableStateOf(false) }
     var showDeleteStationDialog by remember { mutableStateOf(false) }
     var showDeleteCategoryDialog by remember { mutableStateOf(false) }
+    var categoryToDeleteIndex by remember { mutableStateOf(-1) }
     var showSaveStationDialog by remember { mutableStateOf(false) }
 
     val state by viewModel.uiState.collectAsState()
@@ -178,9 +180,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                         }) {
                             Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
                         }
-                        IconButton(onClick = { showCastDialog = true }) {
-                            Icon(imageVector = Icons.Default.Cast, contentDescription = "Cast", tint = Color.White)
-                        }
+                        GoogleCastIconButton()
                         IconButton(onClick = { (context as? Activity)?.finish() }) {
                             Icon(imageVector = Icons.Default.PowerSettingsNew, contentDescription = "Exit App", tint = Color(0xFFD32F2F))
                         }
@@ -611,38 +611,21 @@ fun MainScreen(viewModel: MusicViewModel) {
 
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                                         ) {
-                                            if (isSkipped) {
-                                                Surface(
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    color = Color(0xFF4A1A1A),
-                                                    modifier = Modifier.height(22.dp)
-                                                ) {
-                                                    Box(modifier = Modifier.padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
-                                                        Text("Skipped", color = Color.Red, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                    }
-                                                }
-                                            } else if (isSelected) {
-                                                Surface(
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    color = Color(0xFF1B4D2E),
-                                                    modifier = Modifier.height(22.dp)
-                                                ) {
-                                                    Box(modifier = Modifier.padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
-                                                        Text("Active", color = Color.Green, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                    }
-                                                }
-                                            } else {
-                                                Surface(
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    color = Color(0xFF2A2A34),
-                                                    modifier = Modifier.height(22.dp)
-                                                ) {
-                                                    Box(modifier = Modifier.padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
-                                                        Text("Included", color = Color.LightGray, fontSize = 11.sp, fontWeight = FontWeight.Normal)
-                                                    }
-                                                }
+                                            IconButton(
+                                                onClick = {
+                                                    categoryToDeleteIndex = index
+                                                    showDeleteCategoryDialog = true
+                                                },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.DeleteOutline,
+                                                    contentDescription = "Delete Category",
+                                                    tint = Color(0xFFFF6B6B),
+                                                    modifier = Modifier.size(20.dp)
+                                                )
                                             }
 
                                             ArrowWithRedXIcon(
@@ -1082,8 +1065,13 @@ fun MainScreen(viewModel: MusicViewModel) {
 
     // Delete Category Confirmation Dialog
     if (showDeleteCategoryDialog) {
+        val targetIdx = if (categoryToDeleteIndex >= 0) categoryToDeleteIndex else state.categoryIndex
+        val targetCat = loadedCategories.getOrNull(targetIdx) ?: state.currentCategory
         AlertDialog(
-            onDismissRequest = { showDeleteCategoryDialog = false },
+            onDismissRequest = {
+                showDeleteCategoryDialog = false
+                categoryToDeleteIndex = -1
+            },
             title = {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1091,14 +1079,17 @@ fun MainScreen(viewModel: MusicViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Delete Category", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    IconButton(onClick = { showDeleteCategoryDialog = false }, modifier = Modifier.size(24.dp)) {
+                    IconButton(onClick = {
+                        showDeleteCategoryDialog = false
+                        categoryToDeleteIndex = -1
+                    }, modifier = Modifier.size(24.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
                     }
                 }
             },
             text = {
                 Text(
-                    text = "Are you sure you want to delete category '${state.currentCategory?.name}' and all its ${state.currentCategory?.stations?.size ?: 0} stations?",
+                    text = "Are you sure you want to delete category '${targetCat?.name}' and all its ${targetCat?.stations?.size ?: 0} stations?",
                     color = Color.LightGray,
                     fontSize = 14.sp
                 )
@@ -1106,10 +1097,11 @@ fun MainScreen(viewModel: MusicViewModel) {
             confirmButton = {
                 Button(
                     onClick = {
-                        if (state.categoryIndex >= 0) {
-                            viewModel.onDeleteCategoryClicked(state.categoryIndex)
+                        if (targetIdx >= 0) {
+                            viewModel.onDeleteCategoryClicked(targetIdx)
                         }
                         showDeleteCategoryDialog = false
+                        categoryToDeleteIndex = -1
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
                     modifier = Modifier.fillMaxWidth()
