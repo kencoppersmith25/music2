@@ -31,6 +31,7 @@ data class PlayerState(
     val searchingCategoryName: String? = null,
     val searchError: String? = null,
     val isLightMode: Boolean = false,
+    val themeMode: String = "DARK", // Options: "AUTO", "LIGHT", "DARK"
     val skippedCategoryIds: Set<String> = emptySet(),
     val skippedStationIds: Set<String> = emptySet(),
     val recentlyPlayedTracks: List<PlayedTrack> = emptyList()

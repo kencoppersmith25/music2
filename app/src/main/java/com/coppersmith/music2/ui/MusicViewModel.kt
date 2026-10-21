@@ -94,6 +94,10 @@ class MusicViewModel : ViewModel() {
         repository.toggleLightMode()
     }
 
+    fun onSetThemeMode(mode: String) {
+        repository.setThemeMode(mode)
+    }
+
     fun onSetBluetoothBackAction(action: String) {
         repository.setBluetoothBackAction(action)
     }

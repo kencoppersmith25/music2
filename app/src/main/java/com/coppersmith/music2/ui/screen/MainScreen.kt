@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -128,9 +129,17 @@ fun MainScreen(viewModel: MusicViewModel) {
         }
     }
 
+    val isSystemDark = isSystemInDarkTheme()
+    val isLight = when (state.themeMode) {
+        "LIGHT" -> true
+        "DARK" -> false
+        else -> !isSystemDark
+    }
+    val bgColor = if (isLight) Color(0xFFF2F2F7) else Color(0xFF121216)
+
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFF121216)
+        color = bgColor
     ) {
         Column(
             modifier = Modifier
@@ -1458,21 +1467,58 @@ fun MainScreen(viewModel: MusicViewModel) {
                         )
                     }
 
-                    // Light Mode / Dark Mode Theme toggle
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Light Mode Theme", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Switch UI to clean light theme", color = Color.Gray, fontSize = 12.sp)
+                    // App Theme Selection Mode
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("App Theme Mode", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Select preferred visual appearance:", color = Color.Gray, fontSize = 12.sp)
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.onSetThemeMode("DARK") }
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = state.themeMode == "DARK",
+                                onClick = { viewModel.onSetThemeMode("DARK") },
+                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFD0BCFF))
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Always Dark Theme (Default)", color = Color.White, fontSize = 14.sp)
                         }
-                        Switch(
-                            checked = state.isLightMode,
-                            onCheckedChange = { viewModel.onToggleLightMode() },
-                            colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFD0BCFF))
-                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.onSetThemeMode("LIGHT") }
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = state.themeMode == "LIGHT",
+                                onClick = { viewModel.onSetThemeMode("LIGHT") },
+                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFD0BCFF))
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Always Light Theme", color = Color.White, fontSize = 14.sp)
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.onSetThemeMode("AUTO") }
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = state.themeMode == "AUTO",
+                                onClick = { viewModel.onSetThemeMode("AUTO") },
+                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFD0BCFF))
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Auto (Match System Setting)", color = Color.White, fontSize = 14.sp)
+                        }
                     }
 
                     HorizontalDivider(color = Color.DarkGray)

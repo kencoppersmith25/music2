@@ -96,21 +96,25 @@ object PlaybackRepository {
             val prefs = context.getSharedPreferences("music2_user_data", Context.MODE_PRIVATE)
             val catIdx = prefs.getInt("saved_category_index", 0)
             val statIdx = prefs.getInt("saved_station_index", 0)
-            val isLightMode = prefs.getBoolean("is_light_mode", false)
-            _state.update { it.copy(isLightMode = isLightMode) }
+            val themeMode = prefs.getString("saved_theme_mode", "DARK") ?: "DARK"
+            _state.update { it.copy(themeMode = themeMode, isLightMode = (themeMode == "LIGHT")) }
             return catIdx to statIdx
         } catch (e: Exception) {
             return 0 to 0
         }
     }
 
-    fun toggleLightMode() {
-        val newMode = !_state.value.isLightMode
-        _state.update { it.copy(isLightMode = newMode) }
+    fun setThemeMode(mode: String) {
+        _state.update { it.copy(themeMode = mode, isLightMode = (mode == "LIGHT")) }
         appContext?.let { ctx ->
             ctx.getSharedPreferences("music2_user_data", Context.MODE_PRIVATE)
-                .edit().putBoolean("is_light_mode", newMode).apply()
+                .edit().putString("saved_theme_mode", mode).apply()
         }
+    }
+
+    fun toggleLightMode() {
+        val newMode = if (_state.value.themeMode == "LIGHT") "DARK" else "LIGHT"
+        setThemeMode(newMode)
     }
 
     private fun savePlaylistToDisk(context: Context? = null) {

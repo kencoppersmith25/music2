@@ -87,7 +87,8 @@ fun GoogleCastIconButton(
 
         AndroidView(
             factory = { ctx ->
-                MediaRouteButton(ctx).apply {
+                val themedCtx = android.view.ContextThemeWrapper(ctx, com.coppersmith.music2.R.style.Theme_MyApplication)
+                MediaRouteButton(themedCtx).apply {
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
@@ -96,7 +97,6 @@ fun GoogleCastIconButton(
                         .addControlCategory(CastMediaControlIntent.categoryForCast(CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID))
                         .build()
                     setRouteSelector(selector)
-                    setAlwaysVisible(true)
                     try {
                         CastButtonFactory.setUpMediaRouteButton(ctx, this)
                     } catch (_: Exception) {}
