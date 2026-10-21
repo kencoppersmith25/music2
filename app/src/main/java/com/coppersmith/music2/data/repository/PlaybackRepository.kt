@@ -489,10 +489,8 @@ object PlaybackRepository {
         val currentCat = playlist.getOrNull(_state.value.categoryIndex) ?: return
         if (currentCat.stations.isEmpty()) return
 
-        val isContinuous = _state.value.isContinuousNav
         val currentStatIdx = _state.value.stationIndex
         val currentCatIdx = _state.value.categoryIndex
-        val skippedCats = _state.value.skippedCategoryIds
         val skippedStats = _state.value.skippedStationIds
 
         scope.launch(Dispatchers.Main) {
@@ -505,26 +503,13 @@ object PlaybackRepository {
                     }
                 }
 
-                if (nextStatIdx != -1) {
-                    commitState(currentCatIdx, nextStatIdx)
-                } else {
-                    if (isContinuous && playlist.size > 1) {
-                        var nextCatIdx = currentCatIdx
-                        for (i in 1..playlist.size) {
-                            val candidate = (currentCatIdx + i) % playlist.size
-                            if (!skippedCats.contains(playlist[candidate].id) || i == playlist.size) {
-                                nextCatIdx = candidate
-                                break
-                            }
-                        }
-                        val targetCat = playlist[nextCatIdx]
-                        val firstValidStat = targetCat.stations.indexOfFirst { !skippedStats.contains(it.id) }
-                        commitState(nextCatIdx, if (firstValidStat != -1) firstValidStat else 0)
-                    } else {
-                        val firstValidStat = currentCat.stations.indexOfFirst { !skippedStats.contains(it.id) }
-                        commitState(currentCatIdx, if (firstValidStat != -1) firstValidStat else 0)
-                    }
+                if (nextStatIdx == -1) {
+                    // Wrap around to the first valid station in the current category
+                    nextStatIdx = currentCat.stations.indexOfFirst { !skippedStats.contains(it.id) }
+                    if (nextStatIdx == -1) nextStatIdx = 0
                 }
+
+                commitState(currentCatIdx, nextStatIdx)
             }
         }
     }
@@ -534,10 +519,8 @@ object PlaybackRepository {
         val currentCat = playlist.getOrNull(_state.value.categoryIndex) ?: return
         if (currentCat.stations.isEmpty()) return
 
-        val isContinuous = _state.value.isContinuousNav
         val currentStatIdx = _state.value.stationIndex
         val currentCatIdx = _state.value.categoryIndex
-        val skippedCats = _state.value.skippedCategoryIds
         val skippedStats = _state.value.skippedStationIds
 
         scope.launch(Dispatchers.Main) {
@@ -550,28 +533,13 @@ object PlaybackRepository {
                     }
                 }
 
-                if (prevStatIdx != -1) {
-                    commitState(currentCatIdx, prevStatIdx)
-                } else {
-                    if (isContinuous && playlist.size > 1) {
-                        var prevCatIdx = currentCatIdx
-                        for (i in 1..playlist.size) {
-                            val candidate = if (currentCatIdx - i < 0) (playlist.size + ((currentCatIdx - i) % playlist.size)) % playlist.size else currentCatIdx - i
-                            if (!skippedCats.contains(playlist[candidate].id) || i == playlist.size) {
-                                prevCatIdx = candidate
-                                break
-                            }
-                        }
-                        val prevCat = playlist[prevCatIdx]
-                        val lastValidStat = prevCat.stations.indexOfLast { !skippedStats.contains(it.id) }
-                        val safeStatIdx = if (lastValidStat != -1) lastValidStat else (prevCat.stations.size - 1).coerceAtLeast(0)
-                        commitState(prevCatIdx, safeStatIdx)
-                    } else {
-                        val lastValidStat = currentCat.stations.indexOfLast { !skippedStats.contains(it.id) }
-                        val safeStatIdx = if (lastValidStat != -1) lastValidStat else (currentCat.stations.size - 1).coerceAtLeast(0)
-                        commitState(currentCatIdx, safeStatIdx)
-                    }
+                if (prevStatIdx == -1) {
+                    // Wrap around to the last valid station in the current category (e.g. station 50)
+                    prevStatIdx = currentCat.stations.indexOfLast { !skippedStats.contains(it.id) }
+                    if (prevStatIdx == -1) prevStatIdx = (currentCat.stations.size - 1).coerceAtLeast(0)
                 }
+
+                commitState(currentCatIdx, prevStatIdx)
             }
         }
     }

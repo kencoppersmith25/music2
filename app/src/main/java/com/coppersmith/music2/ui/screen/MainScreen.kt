@@ -152,9 +152,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(60.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xFF1E1E24)),
+                            .size(64.dp)
+                            .background(Color.Transparent),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
