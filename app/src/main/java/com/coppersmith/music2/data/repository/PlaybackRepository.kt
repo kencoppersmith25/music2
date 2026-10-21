@@ -1,6 +1,8 @@
 package com.coppersmith.music2.data.repository
 
 import android.content.Context
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.exoplayer.ExoPlayer
 import com.coppersmith.music2.data.HardcodedDataSource
 import com.coppersmith.music2.data.model.Category
@@ -279,11 +281,27 @@ object PlaybackRepository {
     }
 
     fun updateMetadata(title: String?, artist: String?) {
+        val cleanTitle = title?.trim()?.ifBlank { null }
+        val cleanArtist = artist?.trim()?.ifBlank { null }
         _state.update {
             it.copy(
-                trackTitle = title?.trim()?.ifBlank { null },
-                artistName = artist?.trim()?.ifBlank { null }
+                trackTitle = cleanTitle,
+                artistName = cleanArtist
             )
+        }
+        val currentCat = _state.value.currentCategory?.name ?: "Radio"
+        val currentStat = _state.value.currentStation?.name ?: "Live Stream"
+        scope.launch(Dispatchers.Main) {
+            exoPlayer?.let { player ->
+                val metadata = MediaMetadata.Builder()
+                    .setTitle(cleanTitle ?: currentStat)
+                    .setArtist(cleanArtist ?: "Live Radio Stream")
+                    .setAlbumTitle(currentCat)
+                    .setDisplayTitle(currentStat)
+                    .setSubtitle(cleanArtist ?: currentStat)
+                    .build()
+                player.playlistMetadata = metadata
+            }
         }
     }
 
@@ -334,6 +352,31 @@ object PlaybackRepository {
                 isPlaying = true
             )
         }
+
+        savePlaybackSelectionToDisk(appContext, safeCatIdx, safeStatIdx)
+        RideLogger.log("COMMIT_STATE catIdx=$safeCatIdx statIdx=$safeStatIdx category='${category.name}' station='${station.name}'")
+
+        scope.launch(Dispatchers.Main) {
+            exoPlayer?.let { player ->
+                val metadata = MediaMetadata.Builder()
+                    .setTitle(station.name)
+                    .setArtist(_state.value.artistName ?: "Live Radio Stream")
+                    .setAlbumTitle(category.name)
+                    .setDisplayTitle(station.name)
+                    .setSubtitle(_state.value.artistName ?: "Live Radio Stream")
+                    .build()
+
+                val mediaItem = MediaItem.Builder()
+                    .setUri(station.streamUrl)
+                    .setMediaMetadata(metadata)
+                    .build()
+
+                player.setMediaItem(mediaItem)
+                player.prepare()
+                player.play()
+            }
+        }
+        startStartupWatchdog(station)
     }
 
     suspend fun togglePlayPause() = mutex.withLock {
