@@ -7,6 +7,7 @@ import com.coppersmith.music2.data.model.Category
 import com.coppersmith.music2.data.model.PlayerState
 import com.coppersmith.music2.data.model.Station
 import com.coppersmith.music2.diagnostics.RideLogger
+import com.coppersmith.music2.util.SoundFeedback
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -484,6 +485,7 @@ object PlaybackRepository {
     }
 
     fun nextStation() {
+        SoundFeedback.playStationChangeTone()
         val currentCat = playlist.getOrNull(_state.value.categoryIndex) ?: return
         if (currentCat.stations.isEmpty()) return
 
@@ -528,6 +530,7 @@ object PlaybackRepository {
     }
 
     fun previousStation() {
+        SoundFeedback.playStationChangeTone()
         val currentCat = playlist.getOrNull(_state.value.categoryIndex) ?: return
         if (currentCat.stations.isEmpty()) return
 
@@ -683,6 +686,7 @@ object PlaybackRepository {
     }
 
     suspend fun nextCategory() = mutex.withLock {
+        SoundFeedback.playCategoryChangeTone()
         if (playlist.isEmpty()) return@withLock
         val current = _state.value
         val currentCatIdx = if (current.categoryIndex in playlist.indices) current.categoryIndex else 0
@@ -700,6 +704,7 @@ object PlaybackRepository {
     }
 
     suspend fun previousCategory() = mutex.withLock {
+        SoundFeedback.playCategoryChangeTone()
         if (playlist.isEmpty()) return@withLock
         val current = _state.value
         val currentCatIdx = if (current.categoryIndex in playlist.indices) current.categoryIndex else 0
@@ -717,6 +722,7 @@ object PlaybackRepository {
     }
 
     suspend fun selectCategory(categoryIndex: Int) = mutex.withLock {
+        SoundFeedback.playCategoryChangeTone()
         commitState(categoryIndex) // Recalls last position or defaults to 0 on first visit
     }
 

@@ -19,9 +19,6 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MusicViewModel by viewModels()
 
-    private val notificationPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -33,13 +30,6 @@ class MainActivity : ComponentActivity() {
 
         // Initialize AdManager (Google Mobile Ads SDK)
         com.coppersmith.music2.ads.AdManager.initialize(this)
-
-        // Request notification permission on Android 13+ so foreground service notification can display
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
 
         // Start the playback service as a Foreground Service
         val serviceIntent = Intent(this, MusicPlaybackService::class.java)
