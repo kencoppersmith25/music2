@@ -95,22 +95,27 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         }
     }
 
+    @OptIn(UnstableApi::class)
     private fun promoteToForeground(title: String = "No Hands Radio", text: String = "Live Radio Stream") {
         try {
             val pendingIntent = packageManager.getLaunchIntentForPackage(packageName)?.let { intent ->
                 android.app.PendingIntent.getActivity(this, 0, intent, android.app.PendingIntent.FLAG_IMMUTABLE)
             }
 
-            val notification = NotificationCompat.Builder(this, "media_playback_channel")
+            val builder = NotificationCompat.Builder(this, "media_playback_channel")
                 .setContentTitle(title)
                 .setContentText(text)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setOngoing(true)
                 .setContentIntent(pendingIntent)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setPriority(NotificationCompat.PRIORITY_MIN)
-                .setSilent(true)
-                .build()
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+
+            mediaSession?.let { session ->
+                builder.setStyle(androidx.media3.session.MediaStyleNotificationHelper.MediaStyle(session))
+            }
+
+            val notification = builder.build()
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(1001, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
@@ -401,8 +406,19 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
 
                 if (artist.isNullOrBlank() && !title.isNullOrBlank() && title.contains(" - ")) {
                     val parts = title.split(" - ", limit = 2)
-                    artist = parts[0].trim()
-                    title = parts[1].trim()
+                    val p0 = parts[0].trim()
+                    val p1 = parts[1].trim()
+
+                    val pieceKeywords = listOf("symphony", "concerto", "sonata", "suite", "opus", "no.", "waltz", "mass", "overture", "prelude", "adagio", "allegro", "rhapsody", "spring", "summer", "autumn", "winter", "brandenburg", "requiem", "variation", "nocturne", "serenade", "dances")
+                    val p0IsPiece = pieceKeywords.any { p0.lowercase().contains(it) }
+
+                    if (p0IsPiece) {
+                        title = p0
+                        artist = p1
+                    } else {
+                        artist = p0
+                        title = p1
+                    }
                 }
 
                 Log.d("MusicPlaybackService", "Metadata updated: title=$title, artist=$artist")
