@@ -218,58 +218,11 @@ object RideLogger {
     }
 
     fun emailToSupportDirect(context: Context, onResult: (Boolean, String) -> Unit) {
-        val file = synchronized(lock) { logFile }
-        if (file == null || !file.exists() || file.length() == 0L) {
-            onResult(false, "Ride log is empty.")
-            return
-        }
-
-        val logText = file.readText()
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
-        val deviceModel = "${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})"
-
-        CoroutineScope(Dispatchers.IO).launch {
-            var sentViaHttp = false
-            try {
-                val url = URL("https://formsubmit.co/ajax/kencoppersmith@yahoo.com")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-                conn.setRequestProperty("User-Agent", "NoHandsRadio/2.0 Android")
-                conn.connectTimeout = 8000
-                conn.readTimeout = 8000
-                conn.doOutput = true
-
-                val postData = StringBuilder()
-                    .append("_subject=").append(URLEncoder.encode("No Hands Radio Ride Log - $timestamp", "UTF-8"))
-                    .append("&_captcha=").append(URLEncoder.encode("false", "UTF-8"))
-                    .append("&device=").append(URLEncoder.encode(deviceModel, "UTF-8"))
-                    .append("&timestamp=").append(URLEncoder.encode(timestamp, "UTF-8"))
-                    .append("&ride_log=").append(URLEncoder.encode(logText.takeLast(8000), "UTF-8"))
-                    .toString()
-
-                conn.outputStream.use { os ->
-                    os.write(postData.toByteArray(Charsets.UTF_8))
-                }
-
-                val responseCode = conn.responseCode
-                if (responseCode == 200) {
-                    val respText = conn.inputStream.bufferedReader().use { it.readText() }
-                    if (respText.contains("true") || respText.contains("success")) {
-                        sentViaHttp = true
-                    }
-                }
-                conn.disconnect()
-            } catch (_: Exception) {}
-
-            withContext(Dispatchers.Main) {
-                if (sentViaHttp) {
-                    onResult(true, "Log transmitted! ✉️ (If 1st time, check kencoppersmith@yahoo.com inbox/spam for FormSubmit activation click)")
-                } else {
-                    emailToSupport(context)
-                    onResult(true, "Opening email app to send log...")
-                }
-            }
+        val res = emailToSupport(context)
+        if (res.isSuccess) {
+            onResult(true, "Opening mail app... Tap 'SEND' in your mail app to email log to kencoppersmith@yahoo.com!")
+        } else {
+            onResult(false, "Could not open mail app: ${res.exceptionOrNull()?.message}")
         }
     }
 

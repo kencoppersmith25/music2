@@ -268,7 +268,7 @@ object PlaybackRepository {
 
     private fun startStartupWatchdog(station: Station) {
         cancelStartupWatchdog()
-        val timeoutMs = _state.value.stationTimeoutSeconds * 1000L
+        val timeoutMs = 3500L
         startupWatchdogJob = scope.launch(Dispatchers.IO) {
             delay(timeoutMs)
             if (!_state.value.isPlaying) {
