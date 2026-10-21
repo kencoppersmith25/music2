@@ -81,14 +81,14 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 "media_playback_channel",
-                "Background Service",
-                NotificationManager.IMPORTANCE_MIN
+                "Radio Playback",
+                NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Ongoing live radio stream background service"
+                description = "Live radio stream media controls"
                 setSound(null, null)
                 enableVibration(false)
                 setShowBadge(false)
-                lockscreenVisibility = NotificationCompat.VISIBILITY_SECRET
+                lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager?.createNotificationChannel(channel)
@@ -317,32 +317,14 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         createNotificationChannel()
 
         try {
-            setMediaNotificationProvider(object : MediaNotification.Provider {
-                override fun createNotification(
-                    mediaSession: MediaSession,
-                    customLayout: ImmutableList<CommandButton>,
-                    actionFactory: MediaNotification.ActionFactory,
-                    onNotificationChangedListener: MediaNotification.Provider.Callback
-                ): MediaNotification {
-                    val notification = NotificationCompat.Builder(this@MusicPlaybackService, "media_playback_channel")
-                        .setSmallIcon(R.mipmap.ic_launcher)
-                        .setPriority(NotificationCompat.PRIORITY_MIN)
-                        .setVisibility(NotificationCompat.VISIBILITY_SECRET)
-                        .setCategory(NotificationCompat.CATEGORY_SERVICE)
-                        .setSilent(true)
-                        .setOngoing(true)
-                        .build()
-                    return MediaNotification(1001, notification)
-                }
-
-                override fun handleCustomCommand(
-                    session: MediaSession,
-                    action: String,
-                    extras: android.os.Bundle
-                ): Boolean = false
-            })
+            setMediaNotificationProvider(
+                DefaultMediaNotificationProvider.Builder(this)
+                    .setChannelId("media_playback_channel")
+                    .setNotificationId(1001)
+                    .build()
+            )
         } catch (e: Exception) {
-            Log.e("MusicPlaybackService", "Error setting silent MediaNotificationProvider: ${e.message}")
+            Log.e("MusicPlaybackService", "Error setting DefaultMediaNotificationProvider: ${e.message}")
         }
 
         promoteToForeground()
@@ -608,10 +590,6 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
-
-    override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
-        // Completely suppress notification updates so no media card is posted
-    }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         Log.d("MusicPlaybackService", "App swiped away from recent tasks. Stopping playback.")
