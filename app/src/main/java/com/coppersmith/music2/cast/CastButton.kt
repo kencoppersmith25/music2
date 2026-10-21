@@ -87,19 +87,24 @@ fun GoogleCastIconButton(
 
         AndroidView(
             factory = { ctx ->
-                val themedCtx = android.view.ContextThemeWrapper(ctx, com.coppersmith.music2.R.style.Theme_MyApplication)
-                MediaRouteButton(themedCtx).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    val selector = MediaRouteSelector.Builder()
-                        .addControlCategory(CastMediaControlIntent.categoryForCast(CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID))
-                        .build()
-                    setRouteSelector(selector)
-                    try {
-                        CastButtonFactory.setUpMediaRouteButton(ctx, this)
-                    } catch (_: Exception) {}
+                try {
+                    val themedCtx = android.view.ContextThemeWrapper(ctx, com.coppersmith.music2.R.style.Theme_MyApplication)
+                    MediaRouteButton(themedCtx).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        val selector = MediaRouteSelector.Builder()
+                            .addControlCategory(CastMediaControlIntent.categoryForCast(CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID))
+                            .build()
+                        setRouteSelector(selector)
+                        try {
+                            CastButtonFactory.setUpMediaRouteButton(ctx, this)
+                        } catch (_: Exception) {}
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("CastButton", "MediaRouteButton initialization warning: ${e.message}")
+                    android.view.View(ctx)
                 }
             },
             modifier = Modifier

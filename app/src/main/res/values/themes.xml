@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.MyApplication" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.MyApplication" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:colorBackground">#121216</item>
+        <item name="android:windowBackground">#121216</item>
+        <item name="colorBackgroundFloating">#1E1E24</item>
+    </style>
 </resources>
