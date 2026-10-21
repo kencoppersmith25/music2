@@ -192,16 +192,16 @@ object RideLogger {
         val authority = "${context.packageName}.fileprovider"
         val uri = FileProvider.getUriForFile(context, authority, file)
 
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
+        val emailIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "message/rfc822"
             putExtra(Intent.EXTRA_EMAIL, arrayOf("kencoppersmith@yahoo.com"))
             putExtra(Intent.EXTRA_SUBJECT, "No Hands Radio Diagnostic Ride Log")
-            putExtra(Intent.EXTRA_TEXT, "Hi Ken,\n\nAttached is my diagnostic Ride Log from No Hands Radio.")
+            putExtra(Intent.EXTRA_TEXT, "Hi Ken,\n\nAttached is my diagnostic Ride Log file for No Hands Radio.")
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
-        context.startActivity(Intent.createChooser(intent, "Email Ride Log to Support...").apply {
+        context.startActivity(Intent.createChooser(emailIntent, "Send Ride Log via Email...").apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         })
     }

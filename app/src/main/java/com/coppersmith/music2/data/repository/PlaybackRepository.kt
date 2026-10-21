@@ -60,8 +60,8 @@ object PlaybackRepository {
         appContext = context.applicationContext
         if (_state.value.currentCategory != null) return
         scope.launch(Dispatchers.IO) {
-            val loaded = loadPlaylistFromDisk(context.applicationContext)
             val (savedCatIdx, savedStatIdx) = loadPlaybackSelectionFromDisk(context.applicationContext)
+            val loaded = loadPlaylistFromDisk(context.applicationContext)
             mutex.withLock {
                 if (loaded.isNotEmpty()) {
                     playlist.clear()

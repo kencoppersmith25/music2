@@ -122,8 +122,10 @@ fun MainScreen(viewModel: MusicViewModel) {
 
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    BackHandler(enabled = dropdownExpanded) {
+    BackHandler(enabled = dropdownExpanded || categoriesListExpanded || stationsListExpanded) {
         dropdownExpanded = false
+        categoriesListExpanded = false
+        stationsListExpanded = false
         focusManager.clearFocus()
         keyboardController?.hide()
     }
@@ -854,7 +856,17 @@ fun MainScreen(viewModel: MusicViewModel) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 2.dp),
+                    .padding(vertical = 2.dp)
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) {
+                        dropdownExpanded = false
+                        categoriesListExpanded = false
+                        stationsListExpanded = false
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                    },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
             ) {
