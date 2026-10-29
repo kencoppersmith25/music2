@@ -58,6 +58,15 @@ object PlaybackRepository {
 
     fun initRepository(context: Context) {
         appContext = context.applicationContext
+
+        scope.launch(Dispatchers.Main) {
+            try {
+                if (cachedCastContext == null) {
+                    cachedCastContext = com.google.android.gms.cast.framework.CastContext.getSharedInstance(context.applicationContext)
+                }
+            } catch (_: Exception) {}
+        }
+
         if (_state.value.currentCategory != null) return
 
         scope.launch(Dispatchers.IO) {
@@ -694,6 +703,7 @@ object PlaybackRepository {
     private val categoryLastStationMap = mutableMapOf<Int, Int>()
 
     private var activeCastSession: com.google.android.gms.cast.framework.CastSession? = null
+    private var cachedCastContext: com.google.android.gms.cast.framework.CastContext? = null
 
     fun onCastSessionConnected(session: com.google.android.gms.cast.framework.CastSession) {
         activeCastSession = session
@@ -720,11 +730,7 @@ object PlaybackRepository {
         val session = activeCastSession
         if (session != null && session.isConnected) return session
         return try {
-            appContext?.let { ctx ->
-                val castCtx = com.google.android.gms.cast.framework.CastContext.getSharedInstance(ctx)
-                val curr = castCtx.sessionManager.currentCastSession
-                if (curr?.isConnected == true) curr else null
-            }
+            cachedCastContext?.sessionManager?.currentCastSession?.takeIf { it.isConnected }
         } catch (_: Exception) {
             null
         }
