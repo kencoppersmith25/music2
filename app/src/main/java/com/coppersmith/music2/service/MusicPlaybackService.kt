@@ -627,46 +627,8 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                         releaseWakeLock()
                     }
 
-                    if (isCastingActive && castPlayer != null) {
-                        player.pause() // Keep local phone speaker strictly paused
-                        val cp = castPlayer!!
-                        val currentCastUrl = cp.currentMediaItem?.localConfiguration?.uri?.toString()
-                        val isCastErrorOrIdle = cp.playerError != null || cp.playbackState == Player.STATE_IDLE
-
-                        if (currentCastUrl != station.streamUrl || isCastErrorOrIdle) {
-                            RideLogger.log("SERVICE_CAST_STATION_CHANGE station='${station.name}' url='${station.streamUrl}'")
-                            cp.stop()
-                            cp.clearMediaItems()
-
-                            val metadata = MediaMetadata.Builder()
-                                .setTitle(station.name)
-                                .setArtist(state.currentCategory?.name ?: "Live Radio Stream")
-                                .setStation(station.name)
-                                .setIsPlayable(true)
-                                .setMediaType(MediaMetadata.MEDIA_TYPE_RADIO_STATION)
-                                .build()
-
-                            val mediaItem = MediaItem.Builder()
-                                .setUri(station.streamUrl)
-                                .setMimeType(inferMimeType(station.streamUrl))
-                                .setMediaMetadata(metadata)
-                                .build()
-
-                            cp.setMediaItem(mediaItem)
-                            cp.prepare()
-                            if (state.isPlaying) {
-                                cp.play()
-                            }
-                        } else {
-                            if (state.isPlaying) {
-                                if (cp.playbackState == Player.STATE_IDLE || cp.playbackState == Player.STATE_ENDED) {
-                                    cp.prepare()
-                                }
-                                cp.play()
-                            } else {
-                                cp.pause()
-                            }
-                        }
+                    if (state.isCasting) {
+                        player.pause() // Keep local phone speaker strictly paused while casting!
                     } else if (currentUrl != station.streamUrl || isErrorOrIdle) {
                         RideLogger.log("STATION_CHANGE_INITIATED station='${station.name}' url='${station.streamUrl}' category='${state.currentCategory?.name}'")
                         player.stop()
