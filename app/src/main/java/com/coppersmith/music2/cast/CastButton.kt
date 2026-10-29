@@ -30,7 +30,8 @@ import com.google.android.gms.cast.framework.SessionManagerListener
 
 @Composable
 fun GoogleCastIconButton(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    tint: Color = Color.White
 ) {
     val context = LocalContext.current
     var isConnected by remember { mutableStateOf(false) }
@@ -75,14 +76,14 @@ fun GoogleCastIconButton(
     }
 
     Box(
-        modifier = modifier.size(40.dp),
+        modifier = modifier.size(48.dp),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = if (isConnected) Icons.Default.CastConnected else Icons.Default.Cast,
             contentDescription = "Google Cast Audio",
-            tint = if (isConnected) Color(0xFF81C784) else Color.White,
-            modifier = Modifier.size(24.dp)
+            tint = if (isConnected) Color(0xFF388E3C) else tint,
+            modifier = Modifier.size(36.dp)
         )
 
         AndroidView(

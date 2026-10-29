@@ -189,7 +189,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Top Row: App identity & utility icons
+                    // Top Row: App identity & utility icons (Boosted 50% in size)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -198,10 +198,10 @@ fun MainScreen(viewModel: MusicViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Card(
-                            shape = RoundedCornerShape(16.dp),
+                            shape = RoundedCornerShape(20.dp),
                             border = cardBorder,
                             colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFFFFFFF) else Color(0xFF000000)),
-                            modifier = Modifier.size(54.dp)
+                            modifier = Modifier.size(80.dp)
                         ) {
                             Box(
                                 modifier = Modifier.fillMaxSize(),
@@ -221,19 +221,40 @@ fun MainScreen(viewModel: MusicViewModel) {
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(onClick = {
-                                com.coppersmith.music2.ads.AdManager.maybeShowInterstitial(
-                                    context as? Activity,
-                                    com.coppersmith.music2.ads.AdReason.OPEN_SETTINGS
-                                ) {
-                                    showSettingsDialog = true
-                                }
-                            }) {
-                                Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = iconColor)
+                            IconButton(
+                                onClick = {
+                                    com.coppersmith.music2.ads.AdManager.maybeShowInterstitial(
+                                        context as? Activity,
+                                        com.coppersmith.music2.ads.AdReason.OPEN_SETTINGS
+                                    ) {
+                                        showSettingsDialog = true
+                                    }
+                                },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "Settings",
+                                    tint = iconColor,
+                                    modifier = Modifier.size(36.dp)
+                                )
                             }
-                            GoogleCastIconButton()
-                            IconButton(onClick = { (context as? Activity)?.finish() }) {
-                                Icon(imageVector = Icons.Default.PowerSettingsNew, contentDescription = "Exit App", tint = Color(0xFFD32F2F))
+
+                            GoogleCastIconButton(
+                                modifier = Modifier.size(48.dp),
+                                tint = iconColor
+                            )
+
+                            IconButton(
+                                onClick = { (context as? Activity)?.finish() },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PowerSettingsNew,
+                                    contentDescription = "Exit App",
+                                    tint = Color(0xFFD32F2F),
+                                    modifier = Modifier.size(36.dp)
+                                )
                             }
                         }
                     }
