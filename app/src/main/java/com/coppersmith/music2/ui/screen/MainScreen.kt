@@ -207,8 +207,9 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center
                             ) {
+                                val logoRes = if (isLight) R.drawable.app_logo_light else R.drawable.app_logo
                                 Image(
-                                    painter = painterResource(id = R.drawable.app_logo),
+                                    painter = painterResource(id = logoRes),
                                     contentDescription = "No Hands Radio Logo",
                                     contentScale = ContentScale.Fit,
                                     modifier = Modifier.fillMaxSize()
