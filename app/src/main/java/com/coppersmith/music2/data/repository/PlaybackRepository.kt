@@ -776,7 +776,7 @@ object PlaybackRepository {
                 castMeta.putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, _state.value.currentCategory?.name ?: "Live Radio Stream")
 
                 val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(resolvedUrl)
-                    .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE)
+                    .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_BUFFERED)
                     .setContentType("audio/mpeg")
                     .setMetadata(castMeta)
                     .build()
@@ -784,7 +784,12 @@ object PlaybackRepository {
                 val request = com.google.android.gms.cast.MediaLoadRequestData.Builder()
                     .setMediaInfo(mediaInfo)
                     .setAutoplay(true)
+                    .setCurrentTime(0)
                     .build()
+
+                try {
+                    remoteMediaClient.stop()
+                } catch (_: Exception) {}
 
                 val pendingResult = remoteMediaClient.load(request)
                 pendingResult.setResultCallback { result ->
