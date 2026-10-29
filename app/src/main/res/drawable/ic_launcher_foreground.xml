@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:drawable="@drawable/app_logo"
+        android:drawable="@drawable/app_logo_light"
         android:width="42dp"
         android:height="42dp"
         android:gravity="center" />
