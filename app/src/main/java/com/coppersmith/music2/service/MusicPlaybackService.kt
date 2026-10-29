@@ -338,6 +338,47 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         // Initialize Text-To-Speech engine for category announcements
         textToSpeech = TextToSpeech(this, this)
 
+        // Initialize Google Cast Session Manager Listener in Service
+        try {
+            val castContext = com.google.android.gms.cast.framework.CastContext.getSharedInstance(this)
+            castContext.sessionManager.addSessionManagerListener(
+                object : com.google.android.gms.cast.framework.SessionManagerListener<com.google.android.gms.cast.framework.CastSession> {
+                    override fun onSessionStarting(s: com.google.android.gms.cast.framework.CastSession) {}
+                    override fun onSessionStarted(s: com.google.android.gms.cast.framework.CastSession, id: String) {
+                        RideLogger.log("SERVICE_CAST_STARTED session='$id'")
+                        repository.onCastSessionConnected(s)
+                    }
+                    override fun onSessionStartFailed(s: com.google.android.gms.cast.framework.CastSession, e: Int) {
+                        repository.onCastSessionDisconnected()
+                    }
+                    override fun onSessionEnding(s: com.google.android.gms.cast.framework.CastSession) {}
+                    override fun onSessionEnded(s: com.google.android.gms.cast.framework.CastSession, e: Int) {
+                        RideLogger.log("SERVICE_CAST_ENDED")
+                        repository.onCastSessionDisconnected()
+                    }
+                    override fun onSessionResuming(s: com.google.android.gms.cast.framework.CastSession, id: String) {}
+                    override fun onSessionResumed(s: com.google.android.gms.cast.framework.CastSession, wasSuspended: Boolean) {
+                        RideLogger.log("SERVICE_CAST_RESUMED")
+                        repository.onCastSessionConnected(s)
+                    }
+                    override fun onSessionResumeFailed(s: com.google.android.gms.cast.framework.CastSession, e: Int) {
+                        repository.onCastSessionDisconnected()
+                    }
+                    override fun onSessionSuspended(s: com.google.android.gms.cast.framework.CastSession, e: Int) {
+                        repository.onCastSessionDisconnected()
+                    }
+                },
+                com.google.android.gms.cast.framework.CastSession::class.java
+            )
+
+            val currentSess = castContext.sessionManager.currentCastSession
+            if (currentSess?.isConnected == true) {
+                repository.onCastSessionConnected(currentSess)
+            }
+        } catch (e: Exception) {
+            Log.e("MusicPlaybackService", "CastContext listener setup error: ${e.message}")
+        }
+
         // 1. Configure HTTP Data Source with Cross-Protocol Redirects for Live Radio Streams
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)

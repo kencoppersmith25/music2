@@ -733,7 +733,7 @@ object PlaybackRepository {
 
                 val mediaMetadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK)
                 mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, station.name)
-                mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, "Live Radio Stream")
+                mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, _state.value.currentCategory?.name ?: "Live Radio Stream")
 
                 val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(station.streamUrl)
                     .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE)
@@ -741,17 +741,12 @@ object PlaybackRepository {
                     .setMetadata(mediaMetadata)
                     .build()
 
-                val request = com.google.android.gms.cast.MediaLoadRequestData.Builder()
-                    .setMediaInfo(mediaInfo)
-                    .setAutoplay(true)
-                    .build()
-
-                val pendingResult = remoteMediaClient.load(request)
+                val pendingResult = remoteMediaClient.load(mediaInfo, true, 0)
                 pendingResult.setResultCallback { result ->
                     if (result.status.isSuccess) {
-                        RideLogger.log("CAST_LOAD_SUCCESS station='${station.name}'")
+                        RideLogger.log("CAST_LOAD_SUCCESS station='${station.name}' url='${station.streamUrl}'")
                     } else {
-                        RideLogger.log("CAST_LOAD_FAILED status='${result.status.statusCode}' msg='${result.status.statusMessage}'")
+                        RideLogger.log("CAST_LOAD_FAILED code=${result.status.statusCode} msg='${result.status.statusMessage}'")
                     }
                 }
                 RideLogger.log("CAST_PLAYING_REMOTE station='${station.name}' url='${station.streamUrl}'")
