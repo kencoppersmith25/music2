@@ -49,13 +49,7 @@ object PlaybackRepository {
     private var appContext: Context? = null
 
     init {
-        // Default init; MainActivity calls initRepository(context) to restore saved user categories and playback selection
-        scope.launch(Dispatchers.IO) {
-            if (playlist.isEmpty()) {
-                playlist.add(Category(id = "cat_mixed", name = "Mixed", stations = HardcodedDataSource.initialMixedStations))
-                commitState(0, 0, autoPlay = false)
-            }
-        }
+        // MainActivity calls initRepository(context) to restore saved user categories and playback selection
     }
 
     fun initRepository(context: Context) {
@@ -63,23 +57,30 @@ object PlaybackRepository {
         if (_state.value.currentCategory != null) return
         scope.launch(Dispatchers.IO) {
             val (savedCatIdx, savedStatIdx) = loadPlaybackSelectionFromDisk(context.applicationContext)
+            val prefs = context.getSharedPreferences("music2_user_data", Context.MODE_PRIVATE)
+            val hasSavedPlaylist = prefs.contains("saved_playlist_json")
             val loaded = loadPlaylistFromDisk(context.applicationContext)
+
             mutex.withLock {
-                if (loaded.isNotEmpty()) {
+                if (hasSavedPlaylist) {
                     playlist.clear()
                     playlist.addAll(loaded)
+                } else {
+                    // First run ever: populate default playlist with Mixed category
+                    if (playlist.isEmpty()) {
+                        playlist.add(Category(id = "cat_mixed", name = "Mixed", stations = HardcodedDataSource.initialMixedStations))
+                        savePlaylistToDisk(context.applicationContext)
+                    }
                 }
-                // Ensure Mixed category is always present at position 0
-                if (playlist.none { it.id == "cat_mixed" || it.name.equals("Mixed", ignoreCase = true) }) {
-                    playlist.add(0, Category(id = "cat_mixed", name = "Mixed", stations = HardcodedDataSource.initialMixedStations))
-                }
-                if (playlist.isEmpty()) {
-                    playlist.add(Category(id = "cat_mixed", name = "Mixed", stations = HardcodedDataSource.initialMixedStations))
-                    savePlaylistToDisk(context.applicationContext)
-                }
-                // Restore saved category and station selection without blaring sound on cold launch
-                if (_state.value.currentCategory == null) {
-                    commitState(savedCatIdx, savedStatIdx, autoPlay = false)
+
+                // Restore exact saved category and station selection without blaring sound on cold launch
+                if (_state.value.currentCategory == null && playlist.isNotEmpty()) {
+                    val safeCatIdx = savedCatIdx.coerceIn(0, playlist.size - 1)
+                    val cat = playlist[safeCatIdx]
+                    val safeStatIdx = if (cat.stations.isNotEmpty()) savedStatIdx.coerceIn(0, cat.stations.size - 1) else 0
+                    commitState(safeCatIdx, safeStatIdx, autoPlay = false)
+                } else if (playlist.isEmpty()) {
+                    _state.update { PlayerState() }
                 }
             }
         }
@@ -705,9 +706,9 @@ object PlaybackRepository {
             val safeCatIdx = categoryIndex.coerceIn(0, playlist.size - 1)
             commitState(safeCatIdx, null)
         } else {
-            _state.update {
-                PlayerState()
-            }
+            savePlaybackSelectionToDisk(appContext, -1, -1)
+            exoPlayer?.stop()
+            _state.update { PlayerState() }
         }
     }
 
@@ -727,6 +728,7 @@ object PlaybackRepository {
             val nextStatIdx = statIdx.coerceIn(0, mutableStations.size - 1)
             commitState(catIdx, nextStatIdx)
         } else {
+            // Category has 0 stations left -> AUTOMATICALLY DELETE THE CATEGORY!
             playlist.removeAt(catIdx)
             categoryLastStationMap.remove(catIdx)
             savePlaylistToDisk()
@@ -734,6 +736,8 @@ object PlaybackRepository {
                 val nextCatIdx = catIdx.coerceIn(0, playlist.size - 1)
                 commitState(nextCatIdx, 0)
             } else {
+                savePlaybackSelectionToDisk(appContext, -1, -1)
+                exoPlayer?.stop()
                 _state.update { PlayerState() }
             }
         }

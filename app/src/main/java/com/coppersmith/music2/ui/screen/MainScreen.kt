@@ -469,6 +469,38 @@ fun MainScreen(viewModel: MusicViewModel) {
                     }
                 }
 
+                // Empty Playlist / No Categories Banner
+                if (loadedCategories.isEmpty() && !state.isLoading) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "📻 No Categories Available",
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "You have deleted all categories. Type a genre or radio station in the search bar above to load new categories!",
+                                color = Color.LightGray,
+                                fontSize = 13.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                }
+
                 // Active Category Status Bar
                 Card(
                     modifier = Modifier.fillMaxWidth(),
