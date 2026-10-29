@@ -746,7 +746,14 @@ object PlaybackRepository {
                     .setAutoplay(true)
                     .build()
 
-                remoteMediaClient.load(request)
+                val pendingResult = remoteMediaClient.load(request)
+                pendingResult.setResultCallback { result ->
+                    if (result.status.isSuccess) {
+                        RideLogger.log("CAST_LOAD_SUCCESS station='${station.name}'")
+                    } else {
+                        RideLogger.log("CAST_LOAD_FAILED status='${result.status.statusCode}' msg='${result.status.statusMessage}'")
+                    }
+                }
                 RideLogger.log("CAST_PLAYING_REMOTE station='${station.name}' url='${station.streamUrl}'")
             } catch (e: Exception) {
                 RideLogger.log("CAST_PLAY_ERROR error='${e.message}'")
