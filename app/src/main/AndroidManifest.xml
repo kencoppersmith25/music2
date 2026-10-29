@@ -60,10 +60,14 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3940256099942544~3347511713" />
 
-        <!-- Google Cast Options Provider -->
+        <!-- Google Cast Options Provider & Reconnection Service -->
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
             android:value="com.coppersmith.music2.cast.CastOptionsProvider" />
+
+        <service
+            android:name="com.google.android.gms.cast.framework.ReconnectionService"
+            android:exported="false" />
     </application>
 
 </manifest>

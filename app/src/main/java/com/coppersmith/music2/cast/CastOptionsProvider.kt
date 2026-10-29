@@ -9,10 +9,14 @@ import com.google.android.gms.cast.framework.media.CastMediaOptions
 
 class CastOptionsProvider : OptionsProvider {
     override fun getCastOptions(context: Context): CastOptions {
-        val mediaOptions = CastMediaOptions.Builder().build()
+        val mediaOptions = CastMediaOptions.Builder()
+            .setNotificationOptions(null)
+            .build()
+
         return CastOptions.Builder()
             .setReceiverApplicationId(CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID)
             .setCastMediaOptions(mediaOptions)
+            .setEnableReconnectionService(false)
             .build()
     }
 

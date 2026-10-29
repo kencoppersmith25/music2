@@ -53,7 +53,6 @@ import kotlinx.coroutines.launch
 class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener {
 
     private var mediaSession: MediaSession? = null
-    private var castPlayer: androidx.media3.cast.CastPlayer? = null
     private lateinit var player: ExoPlayer
     private val repository = PlaybackRepository
 
@@ -344,24 +343,6 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         // Initialize Google Cast Session Manager Listener in Service
         try {
             val castContext = com.google.android.gms.cast.framework.CastContext.getSharedInstance(this)
-            castPlayer = androidx.media3.cast.CastPlayer(castContext)
-            repository.castPlayer = castPlayer
-
-            castPlayer?.setSessionAvailabilityListener(object : SessionAvailabilityListener {
-                override fun onCastSessionAvailable() {
-                    RideLogger.log("CAST_PLAYER_SESSION_AVAILABLE")
-                    val sess = castContext.sessionManager.currentCastSession
-                    if (sess != null) {
-                        repository.onCastSessionConnected(sess)
-                    }
-                }
-
-                override fun onCastSessionUnavailable() {
-                    RideLogger.log("CAST_PLAYER_SESSION_UNAVAILABLE")
-                    repository.onCastSessionDisconnected()
-                }
-            })
-
             castContext.sessionManager.addSessionManagerListener(
                 object : com.google.android.gms.cast.framework.SessionManagerListener<com.google.android.gms.cast.framework.CastSession> {
                     override fun onSessionStarting(s: com.google.android.gms.cast.framework.CastSession) {}
