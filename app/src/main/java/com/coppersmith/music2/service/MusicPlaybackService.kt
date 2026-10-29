@@ -53,6 +53,7 @@ import kotlinx.coroutines.launch
 class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener {
 
     private var mediaSession: MediaSession? = null
+    private var castPlayer: CastPlayer? = null
     private lateinit var player: ExoPlayer
     private val repository = PlaybackRepository
 
@@ -343,6 +344,23 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         // Initialize Google Cast Session Manager Listener in Service
         try {
             val castContext = com.google.android.gms.cast.framework.CastContext.getSharedInstance(this)
+            castPlayer = CastPlayer(castContext)
+
+            castPlayer?.setSessionAvailabilityListener(object : SessionAvailabilityListener {
+                override fun onCastSessionAvailable() {
+                    RideLogger.log("SERVICE_CAST_PLAYER_AVAILABLE")
+                    val sess = castContext.sessionManager.currentCastSession
+                    if (sess != null) {
+                        repository.onCastSessionConnected(sess)
+                    }
+                }
+
+                override fun onCastSessionUnavailable() {
+                    RideLogger.log("SERVICE_CAST_PLAYER_UNAVAILABLE")
+                    repository.onCastSessionDisconnected()
+                }
+            })
+
             castContext.sessionManager.addSessionManagerListener(
                 object : com.google.android.gms.cast.framework.SessionManagerListener<com.google.android.gms.cast.framework.CastSession> {
                     override fun onSessionStarting(s: com.google.android.gms.cast.framework.CastSession) {}
@@ -596,10 +614,11 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                 }
 
                 state.currentStation?.let { station ->
+                    val isCastingActive = state.isCasting || (castPlayer?.isCastSessionAvailable == true)
                     val currentUrl = player.currentMediaItem?.localConfiguration?.uri?.toString()
                     val isErrorOrIdle = player.playerError != null || player.playbackState == Player.STATE_IDLE
 
-                    Log.d("MusicPlaybackService", "State update: station=${station.name}, url=${station.streamUrl}, isPlaying=${state.isPlaying}, currentUrl=$currentUrl, isErrorOrIdle=$isErrorOrIdle")
+                    Log.d("MusicPlaybackService", "State update: station=${station.name}, url=${station.streamUrl}, isPlaying=${state.isPlaying}, isCasting=$isCastingActive")
 
                     if (state.isPlaying) {
                         acquireWakeLock()
@@ -608,8 +627,46 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                         releaseWakeLock()
                     }
 
-                    if (state.isCasting) {
-                        player.pause()
+                    if (isCastingActive && castPlayer != null) {
+                        player.pause() // Keep local phone speaker strictly paused
+                        val cp = castPlayer!!
+                        val currentCastUrl = cp.currentMediaItem?.localConfiguration?.uri?.toString()
+                        val isCastErrorOrIdle = cp.playerError != null || cp.playbackState == Player.STATE_IDLE
+
+                        if (currentCastUrl != station.streamUrl || isCastErrorOrIdle) {
+                            RideLogger.log("SERVICE_CAST_STATION_CHANGE station='${station.name}' url='${station.streamUrl}'")
+                            cp.stop()
+                            cp.clearMediaItems()
+
+                            val metadata = MediaMetadata.Builder()
+                                .setTitle(station.name)
+                                .setArtist(state.currentCategory?.name ?: "Live Radio Stream")
+                                .setStation(station.name)
+                                .setIsPlayable(true)
+                                .setMediaType(MediaMetadata.MEDIA_TYPE_RADIO_STATION)
+                                .build()
+
+                            val mediaItem = MediaItem.Builder()
+                                .setUri(station.streamUrl)
+                                .setMimeType(inferMimeType(station.streamUrl))
+                                .setMediaMetadata(metadata)
+                                .build()
+
+                            cp.setMediaItem(mediaItem)
+                            cp.prepare()
+                            if (state.isPlaying) {
+                                cp.play()
+                            }
+                        } else {
+                            if (state.isPlaying) {
+                                if (cp.playbackState == Player.STATE_IDLE || cp.playbackState == Player.STATE_ENDED) {
+                                    cp.prepare()
+                                }
+                                cp.play()
+                            } else {
+                                cp.pause()
+                            }
+                        }
                     } else if (currentUrl != station.streamUrl || isErrorOrIdle) {
                         RideLogger.log("STATION_CHANGE_INITIATED station='${station.name}' url='${station.streamUrl}' category='${state.currentCategory?.name}'")
                         player.stop()
