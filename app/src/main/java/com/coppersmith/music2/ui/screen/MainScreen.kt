@@ -622,7 +622,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                     }
                 }
 
-                // Middle: Compact Now Playing Card (Docked snugly under Category Card)
+                // Middle: Compact Now Playing Card (Tapping toggles Station List modal)
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -631,9 +631,9 @@ fun MainScreen(viewModel: MusicViewModel) {
                             indication = null,
                             interactionSource = remember { MutableInteractionSource() }
                         ) {
-                            dropdownExpanded = false
+                            stationsListExpanded = !stationsListExpanded
                             categoriesListExpanded = false
-                            stationsListExpanded = false
+                            dropdownExpanded = false
                             focusManager.clearFocus()
                             keyboardController?.hide()
                         },
@@ -1081,7 +1081,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 340.dp),
+                                .fillMaxHeight(0.75f),
                             shape = RoundedCornerShape(20.dp),
                             border = modalBorder,
                             colors = CardDefaults.cardColors(containerColor = modalBgColor)
@@ -1193,7 +1193,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 340.dp),
+                                .fillMaxHeight(0.75f),
                             shape = RoundedCornerShape(20.dp),
                             border = modalBorder,
                             colors = CardDefaults.cardColors(containerColor = modalBgColor)
@@ -1243,7 +1243,6 @@ fun MainScreen(viewModel: MusicViewModel) {
                                                 .fillMaxWidth()
                                                 .clickable {
                                                     viewModel.onStationSelected(state.categoryIndex, index)
-                                                    stationsListExpanded = false
                                                 }
                                                 .background(itemBgColor)
                                                 .padding(horizontal = 14.dp, vertical = 8.dp),

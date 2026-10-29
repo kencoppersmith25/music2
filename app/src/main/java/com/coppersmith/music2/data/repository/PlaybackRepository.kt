@@ -725,31 +725,69 @@ object PlaybackRepository {
         }
     }
 
+    private fun resolveStreamRedirectUrl(originalUrl: String): String {
+        return try {
+            val url = URL(originalUrl)
+            val conn = url.openConnection() as HttpURLConnection
+            conn.instanceFollowRedirects = false
+            conn.connectTimeout = 3000
+            conn.readTimeout = 3000
+            conn.setRequestProperty("User-Agent", "NoHandsRadio/1.1 Android")
+            val code = conn.responseCode
+            if (code in 300..399) {
+                val loc = conn.getHeaderField("Location")
+                if (!loc.isNullOrBlank()) loc else originalUrl
+            } else {
+                originalUrl
+            }
+        } catch (_: Exception) {
+            originalUrl
+        }
+    }
+
     private fun playOnCastSession(session: com.google.android.gms.cast.framework.CastSession, station: Station) {
         scope.launch(Dispatchers.Main) {
             val remoteMediaClient = session.remoteMediaClient ?: return@launch
             try {
                 exoPlayer?.pause()
 
+                val resolvedUrl = withContext(Dispatchers.IO) {
+                    resolveStreamRedirectUrl(station.streamUrl)
+                }
+
                 val mediaMetadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK)
                 mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, station.name)
                 mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, _state.value.currentCategory?.name ?: "Live Radio Stream")
 
-                val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(station.streamUrl)
+                val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(resolvedUrl)
                     .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE)
                     .setContentType("audio/mpeg")
                     .setMetadata(mediaMetadata)
                     .build()
 
-                val pendingResult = remoteMediaClient.load(mediaInfo, true, 0)
+                val queueItem = com.google.android.gms.cast.MediaQueueItem.Builder(mediaInfo)
+                    .setAutoplay(true)
+                    .setPreloadTime(0.0)
+                    .build()
+
+                val pendingResult = remoteMediaClient.queueLoad(
+                    arrayOf(queueItem),
+                    0,
+                    com.google.android.gms.cast.MediaStatus.REPEAT_MODE_REPEAT_OFF,
+                    0,
+                    null
+                )
                 pendingResult.setResultCallback { result ->
                     if (result.status.isSuccess) {
-                        RideLogger.log("CAST_LOAD_SUCCESS station='${station.name}' url='${station.streamUrl}'")
+                        RideLogger.log("CAST_LOAD_SUCCESS station='${station.name}' url='$resolvedUrl'")
                     } else {
                         RideLogger.log("CAST_LOAD_FAILED code=${result.status.statusCode} msg='${result.status.statusMessage}'")
+                        try {
+                            remoteMediaClient.load(mediaInfo, true, 0)
+                        } catch (_: Exception) {}
                     }
                 }
-                RideLogger.log("CAST_PLAYING_REMOTE station='${station.name}' url='${station.streamUrl}'")
+                RideLogger.log("CAST_PLAYING_REMOTE station='${station.name}' url='$resolvedUrl'")
             } catch (e: Exception) {
                 RideLogger.log("CAST_PLAY_ERROR error='${e.message}'")
             }
