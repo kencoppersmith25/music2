@@ -784,6 +784,14 @@ object PlaybackRepository {
                     .setAutoplay(true)
                     .build()
 
+                // If currently playing/buffering on TV, stop the active decoder first so the TV receiver resets cleanly
+                if (remoteMediaClient.isPlaying || remoteMediaClient.isBuffering || remoteMediaClient.isPaused) {
+                    try {
+                        remoteMediaClient.stop()
+                        delay(150)
+                    } catch (_: Exception) {}
+                }
+
                 val pendingResult = remoteMediaClient.load(request)
                 pendingResult.setResultCallback { result ->
                     if (result.status.isSuccess) {
