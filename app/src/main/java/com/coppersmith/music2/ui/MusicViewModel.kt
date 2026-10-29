@@ -168,14 +168,7 @@ class MusicViewModel : ViewModel() {
 
     fun onCategorySelected(categoryId: String, categoryName: String, tag: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            val existingIndex = repository.playlist.indexOfFirst {
-                it.id == categoryId || it.name.equals(categoryName, ignoreCase = true)
-            }
-            if (existingIndex != -1 && repository.playlist[existingIndex].stations.isNotEmpty()) {
-                repository.selectCategory(existingIndex)
-            } else {
-                repository.loadCategoryLive(categoryId, categoryName, tag)
-            }
+            repository.loadCategoryLive(categoryId, categoryName, tag)
         }
     }
 }

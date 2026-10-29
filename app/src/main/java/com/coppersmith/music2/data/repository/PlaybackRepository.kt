@@ -385,7 +385,29 @@ object PlaybackRepository {
         if (currentState.currentStation == null && playlist.isNotEmpty()) {
             commitState(0, 0)
         } else {
-            _state.update { it.copy(isPlaying = !it.isPlaying) }
+            val willPlay = !currentState.isPlaying
+            val session = activeCastSession
+            if (session != null && session.isConnected) {
+                val remoteMediaClient = session.remoteMediaClient
+                if (remoteMediaClient != null) {
+                    if (willPlay) {
+                        if (remoteMediaClient.isPaused) {
+                            remoteMediaClient.play()
+                        } else {
+                            currentState.currentStation?.let { playOnCastSession(session, it) }
+                        }
+                    } else {
+                        remoteMediaClient.pause()
+                    }
+                }
+            } else {
+                if (willPlay) {
+                    currentState.currentStation?.let { startStartupWatchdog(it) }
+                } else {
+                    exoPlayer?.pause()
+                }
+            }
+            _state.update { it.copy(isPlaying = willPlay) }
         }
     }
 

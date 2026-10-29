@@ -199,8 +199,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                     ) {
                         Card(
                             shape = RoundedCornerShape(20.dp),
-                            border = cardBorder,
-                            colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFFFFFFF) else Color(0xFF000000)),
+                            border = null,
+                            colors = CardDefaults.cardColors(containerColor = bgColor),
                             modifier = Modifier.size(80.dp)
                         ) {
                             Box(
