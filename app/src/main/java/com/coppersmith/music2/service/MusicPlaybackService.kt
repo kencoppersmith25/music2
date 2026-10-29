@@ -35,6 +35,8 @@ import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.cast.CastPlayer
+import androidx.media3.cast.SessionAvailabilityListener
 import com.google.common.collect.ImmutableList
 import com.coppersmith.music2.data.repository.PlaybackRepository
 import com.coppersmith.music2.diagnostics.RideLogger
@@ -51,6 +53,7 @@ import kotlinx.coroutines.launch
 class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener {
 
     private var mediaSession: MediaSession? = null
+    private var castPlayer: androidx.media3.cast.CastPlayer? = null
     private lateinit var player: ExoPlayer
     private val repository = PlaybackRepository
 
@@ -341,6 +344,24 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         // Initialize Google Cast Session Manager Listener in Service
         try {
             val castContext = com.google.android.gms.cast.framework.CastContext.getSharedInstance(this)
+            castPlayer = androidx.media3.cast.CastPlayer(castContext)
+            repository.castPlayer = castPlayer
+
+            castPlayer?.setSessionAvailabilityListener(object : SessionAvailabilityListener {
+                override fun onCastSessionAvailable() {
+                    RideLogger.log("CAST_PLAYER_SESSION_AVAILABLE")
+                    val sess = castContext.sessionManager.currentCastSession
+                    if (sess != null) {
+                        repository.onCastSessionConnected(sess)
+                    }
+                }
+
+                override fun onCastSessionUnavailable() {
+                    RideLogger.log("CAST_PLAYER_SESSION_UNAVAILABLE")
+                    repository.onCastSessionDisconnected()
+                }
+            })
+
             castContext.sessionManager.addSessionManagerListener(
                 object : com.google.android.gms.cast.framework.SessionManagerListener<com.google.android.gms.cast.framework.CastSession> {
                     override fun onSessionStarting(s: com.google.android.gms.cast.framework.CastSession) {}
