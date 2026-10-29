@@ -68,7 +68,7 @@ fun ArrowWithRedXIcon(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.TrendingFlat,
                 contentDescription = if (isContinuousNav) "Continuous Navigation On" else "Continuous Navigation Off",
-                tint = if (isContinuousNav) Color.Green else Color.LightGray,
+                tint = if (isContinuousNav) Color.Green else Color.Gray,
                 modifier = Modifier.size(26.dp)
             )
             if (!isContinuousNav) {
@@ -152,6 +152,15 @@ fun MainScreen(viewModel: MusicViewModel) {
         else -> !isSystemDark
     }
     val bgColor = if (isLight) Color(0xFFF2F2F7) else Color(0xFF000000)
+    val cardBgColor = if (isLight) Color(0xFFFFFFFF) else Color(0xFF1E1E24)
+    val cardBorder = if (isLight) BorderStroke(1.dp, Color(0xFFE5E5EA)) else null
+    val primaryTextColor = if (isLight) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)
+    val purpleAccentColor = if (isLight) Color(0xFF6750A4) else Color(0xFFD0BCFF)
+    val subTextColor = if (isLight) Color(0xFF6E6E73) else Color.LightGray
+    val iconColor = if (isLight) Color(0xFF3C3C43) else Color.White
+    val modalBgColor = if (isLight) Color(0xFFFFFFFF) else Color(0xFF22222B)
+    val modalBorder = BorderStroke(1.5.dp, purpleAccentColor)
+    val dividerColor = if (isLight) Color(0xFFE5E5EA) else Color(0xFF2E2E38)
 
     LaunchedEffect(isLight) {
         (context as? Activity)?.window?.let { window ->
@@ -190,6 +199,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                     ) {
                         Card(
                             shape = RoundedCornerShape(16.dp),
+                            border = cardBorder,
                             colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFFFFFFF) else Color(0xFF000000)),
                             modifier = Modifier.size(54.dp)
                         ) {
@@ -218,7 +228,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                     showSettingsDialog = true
                                 }
                             }) {
-                                Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                                Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = iconColor)
                             }
                             GoogleCastIconButton()
                             IconButton(onClick = { (context as? Activity)?.finish() }) {
@@ -232,7 +242,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(24.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
+                            border = cardBorder,
+                            colors = CardDefaults.cardColors(containerColor = cardBgColor)
                         ) {
                             Row(
                                 modifier = Modifier
@@ -251,7 +262,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                     placeholder = {
                                         Text(
                                             "Search category or genre...",
-                                            color = Color.Gray,
+                                            color = subTextColor,
                                             fontSize = 13.sp
                                         )
                                     },
@@ -261,8 +272,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         disabledContainerColor = Color.Transparent,
                                         focusedIndicatorColor = Color.Transparent,
                                         unfocusedIndicatorColor = Color.Transparent,
-                                        focusedTextColor = Color.White,
-                                        unfocusedTextColor = Color.White
+                                        focusedTextColor = primaryTextColor,
+                                        unfocusedTextColor = primaryTextColor
                                     ),
                                     modifier = Modifier
                                         .weight(1f)
@@ -299,7 +310,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                             Icon(
                                                 imageVector = Icons.Default.Close,
                                                 contentDescription = "Clear & Close Dropdown",
-                                                tint = Color.Gray,
+                                                tint = subTextColor,
                                                 modifier = Modifier.size(18.dp)
                                             )
                                         }
@@ -314,7 +325,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         Icon(
                                             imageVector = if (dropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
                                             contentDescription = "Toggle Dropdown",
-                                            tint = Color.White,
+                                            tint = iconColor,
                                             modifier = Modifier.size(24.dp)
                                         )
                                     }
@@ -332,7 +343,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         Icon(
                                             imageVector = Icons.Default.Search,
                                             contentDescription = "Search Category",
-                                            tint = Color.White,
+                                            tint = iconColor,
                                             modifier = Modifier.size(22.dp)
                                         )
                                     }
@@ -351,6 +362,9 @@ fun MainScreen(viewModel: MusicViewModel) {
                         "Reggae", "Metal", "Oldies", "Chillout", "Soundtrack", "Talk", "News"
                     )
 
+                    val chipBgSelected = if (isLight) Color(0xFF6750A4) else Color(0xFF5C5470)
+                    val chipBgUnselected = if (isLight) Color(0xFFE5E5EA) else Color(0xFF1E1E24)
+
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -363,14 +377,18 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 Surface(
                                     onClick = { onPerformCategorySearch(chipName) },
                                     shape = RoundedCornerShape(16.dp),
-                                    color = if (isSelected) Color(0xFF5C5470) else Color(0xFF1E1E24),
+                                    color = if (isSelected) chipBgSelected else chipBgUnselected,
                                     modifier = Modifier.height(32.dp)
                                 ) {
                                     Box(
                                         modifier = Modifier.padding(horizontal = 14.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(text = chipName, color = Color.White, fontSize = 13.sp)
+                                        Text(
+                                            text = chipName,
+                                            color = if (isSelected) Color.White else primaryTextColor,
+                                            fontSize = 13.sp
+                                        )
                                     }
                                 }
                             }
@@ -382,14 +400,18 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 Surface(
                                     onClick = { onPerformCategorySearch(chipName) },
                                     shape = RoundedCornerShape(16.dp),
-                                    color = if (isSelected) Color(0xFF5C5470) else Color(0xFF1E1E24),
+                                    color = if (isSelected) chipBgSelected else chipBgUnselected,
                                     modifier = Modifier.height(32.dp)
                                 ) {
                                     Box(
                                         modifier = Modifier.padding(horizontal = 14.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(text = chipName, color = Color.White, fontSize = 13.sp)
+                                        Text(
+                                            text = chipName,
+                                            color = if (isSelected) Color.White else primaryTextColor,
+                                            fontSize = 13.sp
+                                        )
                                     }
                                 }
                             }
@@ -403,7 +425,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp),
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
+                            border = cardBorder,
+                            colors = CardDefaults.cardColors(containerColor = cardBgColor)
                         ) {
                             Column(
                                 modifier = Modifier
@@ -414,13 +437,13 @@ fun MainScreen(viewModel: MusicViewModel) {
                             ) {
                                 Text(
                                     text = "📻 No Categories Available",
-                                    color = Color.White,
+                                    color = primaryTextColor,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
                                     text = "You have deleted all categories. Type a genre or radio station in the search bar above to load new categories!",
-                                    color = Color.LightGray,
+                                    color = subTextColor,
                                     fontSize = 13.sp,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                 )
@@ -432,7 +455,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
+                        border = cardBorder,
+                        colors = CardDefaults.cardColors(containerColor = cardBgColor)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Row(
@@ -462,7 +486,7 @@ fun MainScreen(viewModel: MusicViewModel) {
 
                                     Text(
                                         text = categoryTitle,
-                                        color = Color(0xFFD0BCFF),
+                                        color = purpleAccentColor,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 15.sp,
                                         maxLines = 1,
@@ -473,7 +497,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                     if (!state.isLoading) {
                                         Text(
                                             text = if (totalCategories > 0) "Category $currentCategoryNum of $totalCategories" else "No Categories",
-                                            color = Color.Gray,
+                                            color = subTextColor,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Normal,
                                             maxLines = 1
@@ -497,7 +521,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Filled.FormatListBulleted,
                                             contentDescription = "Stations List",
-                                            tint = if (stationsListExpanded) Color(0xFFD0BCFF) else Color.White
+                                            tint = if (stationsListExpanded) purpleAccentColor else iconColor
                                         )
                                     }
 
@@ -513,7 +537,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         Icon(
                                             imageVector = Icons.Default.Delete,
                                             contentDescription = "Delete Category",
-                                            tint = Color.White
+                                            tint = iconColor
                                         )
                                     }
 
@@ -532,7 +556,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             if (state.isLoading) {
                                 LinearProgressIndicator(
                                     modifier = Modifier.fillMaxWidth(),
-                                    color = Color(0xFFD0BCFF),
+                                    color = purpleAccentColor,
                                     trackColor = Color.Transparent
                                 )
                             }
@@ -544,7 +568,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF4A1A1A))
+                            colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFFFD8D8) else Color(0xFF4A1A1A))
                         ) {
                             Row(
                                 modifier = Modifier
@@ -555,7 +579,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             ) {
                                 Text(
                                     text = state.searchError ?: "",
-                                    color = Color.White,
+                                    color = if (isLight) Color(0xFF900000) else Color.White,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Medium,
                                     modifier = Modifier.weight(1f)
@@ -567,7 +591,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                     Icon(
                                         imageVector = Icons.Default.Close,
                                         contentDescription = "Dismiss",
-                                        tint = Color.LightGray,
+                                        tint = if (isLight) Color(0xFF900000) else Color.LightGray,
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
@@ -592,7 +616,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                             keyboardController?.hide()
                         },
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
+                    border = cardBorder,
+                    colors = CardDefaults.cardColors(containerColor = cardBgColor)
                 ) {
                     Row(
                         modifier = Modifier
@@ -611,7 +636,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             val stationDisplayName = state.currentStation?.name ?: "Select a station"
                             Text(
                                 text = if (totalStations > 0) "$stationDisplayName ($currentStationNum of $totalStations)" else stationDisplayName,
-                                color = Color.White,
+                                color = primaryTextColor,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
@@ -623,7 +648,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             val songTitle = state.trackTitle ?: stationDisplayName
                             Text(
                                 text = "Title: $songTitle",
-                                color = Color(0xFFD0BCFF),
+                                color = purpleAccentColor,
                                 fontSize = 13.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -634,7 +659,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             val artist = state.artistName ?: "Live Radio Stream"
                             Text(
                                 text = "Artist: $artist",
-                                color = Color.LightGray,
+                                color = subTextColor,
                                 fontSize = 13.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -662,7 +687,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                     Icon(
                                         imageVector = Icons.Default.BookmarkAdd,
                                         contentDescription = "Save Station to Category",
-                                        tint = Color.White,
+                                        tint = iconColor,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -674,7 +699,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                     Icon(
                                         imageVector = Icons.Default.DeleteOutline,
                                         contentDescription = "Delete Station",
-                                        tint = Color.White,
+                                        tint = iconColor,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -714,7 +739,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                         .fillMaxWidth()
                         .heightIn(min = 100.dp, max = 220.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFFFFFFF) else Color(0xFF1B1B22))
+                    border = cardBorder,
+                    colors = CardDefaults.cardColors(containerColor = cardBgColor)
                 ) {
                     Column(
                         modifier = Modifier
@@ -731,7 +757,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                         ) {
                             Text(
                                 text = "Composer & Piece Information 📖",
-                                color = Color(0xFFD0BCFF),
+                                color = purpleAccentColor,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -745,11 +771,11 @@ fun MainScreen(viewModel: MusicViewModel) {
                                     }
                                 },
                                 shape = RoundedCornerShape(12.dp),
-                                color = Color(0xFF383842),
+                                color = if (isLight) Color(0xFFE5E5EA) else Color(0xFF383842),
                                 modifier = Modifier.height(24.dp)
                             ) {
                                 Box(modifier = Modifier.padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
-                                    Text("Search Google 🔍", color = Color(0xFFD0BCFF), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                    Text("Search Google 🔍", color = purpleAccentColor, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                                 }
                             }
                         }
@@ -770,8 +796,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         val url = "https://www.google.com/search?q=" + URLEncoder.encode(composer, "UTF-8")
                                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                                     },
-                                    label = { Text("🔍 Composer: $composer", fontSize = 11.sp, color = Color(0xFFD0BCFF)) },
-                                    colors = FilterChipDefaults.filterChipColors(containerColor = Color(0xFF2E2E38))
+                                    label = { Text("🔍 Composer: $composer", fontSize = 11.sp, color = purpleAccentColor) },
+                                    colors = FilterChipDefaults.filterChipColors(containerColor = if (isLight) Color(0xFFF2F2F7) else Color(0xFF2E2E38))
                                 )
                             }
 
@@ -783,8 +809,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         val url = "https://www.google.com/search?q=" + URLEncoder.encode(piece, "UTF-8")
                                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                                     },
-                                    label = { Text("🎵 Piece: $piece", fontSize = 11.sp, color = Color(0xFFD0BCFF)) },
-                                    colors = FilterChipDefaults.filterChipColors(containerColor = Color(0xFF2E2E38))
+                                    label = { Text("🎵 Piece: $piece", fontSize = 11.sp, color = purpleAccentColor) },
+                                    colors = FilterChipDefaults.filterChipColors(containerColor = if (isLight) Color(0xFFF2F2F7) else Color(0xFF2E2E38))
                                 )
                             }
 
@@ -796,13 +822,13 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         val url = "https://www.google.com/search?q=" + URLEncoder.encode("$station radio station", "UTF-8")
                                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                                     },
-                                    label = { Text("📻 Station: $station", fontSize = 11.sp, color = Color(0xFFD0BCFF)) },
-                                    colors = FilterChipDefaults.filterChipColors(containerColor = Color(0xFF2E2E38))
+                                    label = { Text("📻 Station: $station", fontSize = 11.sp, color = purpleAccentColor) },
+                                    colors = FilterChipDefaults.filterChipColors(containerColor = if (isLight) Color(0xFFF2F2F7) else Color(0xFF2E2E38))
                                 )
                             }
                         }
 
-                        HorizontalDivider(color = Color(0xFF2B2B36), thickness = 1.dp)
+                        HorizontalDivider(color = dividerColor, thickness = 1.dp)
 
                         if (autoFetching) {
                             Row(
@@ -810,9 +836,9 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center
                             ) {
-                                CircularProgressIndicator(color = Color(0xFFD0BCFF), modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                CircularProgressIndicator(color = purpleAccentColor, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Looking up composer info...", color = Color.Gray, fontSize = 12.sp)
+                                Text("Looking up composer info...", color = subTextColor, fontSize = 12.sp)
                             }
                         } else {
                             val info = autoTrackInfo
@@ -824,7 +850,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                     item {
                                         Text(
                                             text = info.description,
-                                            color = if (isLight) Color(0xFF2C2C2E) else Color.LightGray,
+                                            color = primaryTextColor,
                                             fontSize = 12.sp,
                                             lineHeight = 16.sp
                                         )
@@ -833,7 +859,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             } else {
                                 Text(
                                     text = "No automatic summary found for '$searchReq'. Tap Google Search chips above for recordings and composer details.",
-                                    color = Color.Gray,
+                                    color = subTextColor,
                                     fontSize = 12.sp
                                 )
                             }
@@ -860,7 +886,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             Icon(
                                 imageVector = Icons.Default.KeyboardDoubleArrowLeft,
                                 contentDescription = "Previous Category",
-                                tint = Color.White,
+                                tint = iconColor,
                                 modifier = Modifier.size(30.dp)
                             )
                         }
@@ -872,7 +898,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                                 contentDescription = "Previous Station",
-                                tint = Color.White,
+                                tint = iconColor,
                                 modifier = Modifier.size(30.dp)
                             )
                         }
@@ -900,7 +926,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                 contentDescription = "Next Station",
-                                tint = Color.White,
+                                tint = iconColor,
                                 modifier = Modifier.size(30.dp)
                             )
                         }
@@ -912,7 +938,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             Icon(
                                 imageVector = Icons.Default.KeyboardDoubleArrowRight,
                                 contentDescription = "Next Category",
-                                tint = Color.White,
+                                tint = iconColor,
                                 modifier = Modifier.size(30.dp)
                             )
                         }
@@ -931,7 +957,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.70f))
+                        .background(if (isLight) Color.Black.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.70f))
                         .clickable(
                             indication = null,
                             interactionSource = remember { MutableInteractionSource() }
@@ -959,8 +985,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 .fillMaxWidth()
                                 .heightIn(max = 320.dp),
                             shape = RoundedCornerShape(20.dp),
-                            border = BorderStroke(1.5.dp, Color(0xFFD0BCFF)),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF22222B))
+                            border = modalBorder,
+                            colors = CardDefaults.cardColors(containerColor = modalBgColor)
                         ) {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Row(
@@ -972,7 +998,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 ) {
                                     Text(
                                         text = "Select Category / Genre:",
-                                        color = Color(0xFFD0BCFF),
+                                        color = purpleAccentColor,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -986,12 +1012,12 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         Icon(
                                             imageVector = Icons.Default.Close,
                                             contentDescription = "Close Dropdown",
-                                            tint = Color.Gray,
+                                            tint = subTextColor,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
                                 }
-                                HorizontalDivider(color = Color(0xFF2E2E38), thickness = 1.dp)
+                                HorizontalDivider(color = dividerColor, thickness = 1.dp)
                                 LazyColumn(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1008,7 +1034,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         ) {
                                             Text(
                                                 text = category,
-                                                color = Color.White,
+                                                color = primaryTextColor,
                                                 fontSize = 15.sp,
                                                 fontWeight = FontWeight.Medium
                                             )
@@ -1035,8 +1061,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 .fillMaxWidth()
                                 .heightIn(max = 340.dp),
                             shape = RoundedCornerShape(20.dp),
-                            border = BorderStroke(1.5.dp, Color(0xFFD0BCFF)),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF22222B))
+                            border = modalBorder,
+                            colors = CardDefaults.cardColors(containerColor = modalBgColor)
                         ) {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Row(
@@ -1048,7 +1074,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 ) {
                                     Text(
                                         text = "All Loaded Categories ($totalCategories)",
-                                        color = Color(0xFFD0BCFF),
+                                        color = purpleAccentColor,
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -1059,12 +1085,12 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         Icon(
                                             imageVector = Icons.Default.Close,
                                             contentDescription = "Close Category List",
-                                            tint = Color.Gray,
+                                            tint = subTextColor,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
                                 }
-                                HorizontalDivider(color = Color(0xFF2E2E38), thickness = 1.dp)
+                                HorizontalDivider(color = dividerColor, thickness = 1.dp)
                                 LazyColumn(
                                     state = categoriesListState,
                                     modifier = Modifier
@@ -1075,6 +1101,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         if (index !in loadedCategories.indices) return@itemsIndexed
                                         val isSelected = index == state.categoryIndex
                                         val isSkipped = state.skippedCategoryIds.contains(category.id)
+                                        val itemBgColor = if (isSelected) (if (isLight) Color(0xFFE5E5EA) else Color(0xFF383842)) else Color.Transparent
+
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -1082,14 +1110,14 @@ fun MainScreen(viewModel: MusicViewModel) {
                                                     viewModel.onCategorySelected(index)
                                                     categoriesListExpanded = false
                                                 }
-                                                .background(if (isSelected) Color(0xFF383842) else Color.Transparent)
+                                                .background(itemBgColor)
                                                 .padding(horizontal = 14.dp, vertical = 8.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
                                             Text(
                                                 text = "Category ${index + 1}. ${category.name} (${category.stations.size})",
-                                                color = if (isSelected) Color(0xFFD0BCFF) else Color.White,
+                                                color = if (isSelected) purpleAccentColor else primaryTextColor,
                                                 fontSize = 14.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                                 maxLines = 1,
@@ -1145,8 +1173,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 .fillMaxWidth()
                                 .heightIn(max = 340.dp),
                             shape = RoundedCornerShape(20.dp),
-                            border = BorderStroke(1.5.dp, Color(0xFFD0BCFF)),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF22222B))
+                            border = modalBorder,
+                            colors = CardDefaults.cardColors(containerColor = modalBgColor)
                         ) {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Row(
@@ -1158,7 +1186,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 ) {
                                     Text(
                                         text = "Stations in ${state.currentCategory?.name ?: "Category"}",
-                                        color = Color(0xFFD0BCFF),
+                                        color = purpleAccentColor,
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -1169,12 +1197,12 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         Icon(
                                             imageVector = Icons.Default.Close,
                                             contentDescription = "Close Station List",
-                                            tint = Color.Gray,
+                                            tint = subTextColor,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
                                 }
-                                HorizontalDivider(color = Color(0xFF2E2E38), thickness = 1.dp)
+                                HorizontalDivider(color = dividerColor, thickness = 1.dp)
                                 val currentCatStations = state.currentCategory?.stations ?: emptyList()
                                 LazyColumn(
                                     state = stationsListState,
@@ -1186,6 +1214,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         if (index !in currentCatStations.indices) return@itemsIndexed
                                         val isSelected = index == state.stationIndex
                                         val totalStationCount = currentCatStations.size
+                                        val itemBgColor = if (isSelected) (if (isLight) Color(0xFFE5E5EA) else Color(0xFF383842)) else Color.Transparent
+
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -1193,14 +1223,14 @@ fun MainScreen(viewModel: MusicViewModel) {
                                                     viewModel.onStationSelected(state.categoryIndex, index)
                                                     stationsListExpanded = false
                                                 }
-                                                .background(if (isSelected) Color(0xFF383842) else Color.Transparent)
+                                                .background(itemBgColor)
                                                 .padding(horizontal = 14.dp, vertical = 8.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
                                             Text(
                                                 text = "${index + 1}. ${station.name}",
-                                                color = if (isSelected) Color(0xFFD0BCFF) else Color.White,
+                                                color = if (isSelected) purpleAccentColor else primaryTextColor,
                                                 fontSize = 14.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                                 maxLines = 1,
@@ -1215,7 +1245,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                                 if (isSelected && state.isPlaying) {
                                                     Text(
                                                         text = "Playing",
-                                                        color = Color.Green,
+                                                        color = Color(0xFF388E3C),
                                                         fontSize = 11.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         modifier = Modifier.padding(end = 4.dp)
@@ -1230,7 +1260,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                                     Icon(
                                                         imageVector = Icons.Default.KeyboardArrowUp,
                                                         contentDescription = "Move Up",
-                                                        tint = if (index > 0) Color.White else Color.DarkGray,
+                                                        tint = if (index > 0) iconColor else Color.Gray,
                                                         modifier = Modifier.size(20.dp)
                                                     )
                                                 }
@@ -1243,7 +1273,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                                     Icon(
                                                         imageVector = Icons.Default.KeyboardArrowDown,
                                                         contentDescription = "Move Down",
-                                                        tint = if (index < totalStationCount - 1) Color.White else Color.DarkGray,
+                                                        tint = if (index < totalStationCount - 1) iconColor else Color.Gray,
                                                         modifier = Modifier.size(20.dp)
                                                     )
                                                 }
@@ -1280,19 +1310,19 @@ fun MainScreen(viewModel: MusicViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Delete Category", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Delete Category", color = primaryTextColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     IconButton(onClick = {
                         showDeleteCategoryDialog = false
                         categoryToDeleteIndex = -1
                     }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = subTextColor)
                     }
                 }
             },
             text = {
                 Text(
                     text = "Are you sure you want to delete category '${targetCat?.name}' and all its ${targetCat?.stations?.size ?: 0} stations?",
-                    color = Color.LightGray,
+                    color = subTextColor,
                     fontSize = 14.sp
                 )
             },
@@ -1311,7 +1341,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                     Text("Delete Category", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
-            containerColor = Color(0xFF1E1E24)
+            containerColor = cardBgColor
         )
     }
 
@@ -1325,16 +1355,16 @@ fun MainScreen(viewModel: MusicViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Delete Station", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Delete Station", color = primaryTextColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     IconButton(onClick = { showDeleteStationDialog = false }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = subTextColor)
                     }
                 }
             },
             text = {
                 Text(
                     text = "Are you sure you want to delete station '${state.currentStation?.name}' from '${state.currentCategory?.name}'?",
-                    color = Color.LightGray,
+                    color = subTextColor,
                     fontSize = 14.sp
                 )
             },
@@ -1350,7 +1380,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                     Text("Delete Station", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
-            containerColor = Color(0xFF1E1E24)
+            containerColor = cardBgColor
         )
     }
 
@@ -1370,9 +1400,9 @@ fun MainScreen(viewModel: MusicViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Save Station to Category", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Save Station to Category", color = primaryTextColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     IconButton(onClick = { showSaveStationDialog = false }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = subTextColor)
                     }
                 }
             },
@@ -1385,7 +1415,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                 ) {
                     Text(
                         text = "Station: ${state.currentStation?.name}",
-                        color = Color(0xFFD0BCFF),
+                        color = purpleAccentColor,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -1394,13 +1424,13 @@ fun MainScreen(viewModel: MusicViewModel) {
                     OutlinedTextField(
                         value = customCatInput,
                         onValueChange = { customCatInput = it },
-                        placeholder = { Text("New category name (e.g. Hello)", color = Color.Gray, fontSize = 13.sp) },
+                        placeholder = { Text("New category name (e.g. Hello)", color = subTextColor, fontSize = 13.sp) },
                         singleLine = true,
                         colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF2B2B36),
-                            unfocusedContainerColor = Color(0xFF2B2B36),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedContainerColor = if (isLight) Color(0xFFF2F2F7) else Color(0xFF2B2B36),
+                            unfocusedContainerColor = if (isLight) Color(0xFFF2F2F7) else Color(0xFF2B2B36),
+                            focusedTextColor = primaryTextColor,
+                            unfocusedTextColor = primaryTextColor
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -1422,13 +1452,13 @@ fun MainScreen(viewModel: MusicViewModel) {
 
                     // Option 2: Suggested Category on single line
                     if (!suggestedName.isNullOrBlank()) {
-                        HorizontalDivider(color = Color(0xFF2E2E38))
+                        HorizontalDivider(color = dividerColor)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Suggested:", color = Color.Gray, fontSize = 13.sp)
+                            Text("Suggested:", color = subTextColor, fontSize = 13.sp)
                             Button(
                                 onClick = {
                                     state.currentStation?.let { station ->
@@ -1436,7 +1466,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                     }
                                     showSaveStationDialog = false
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C5470)),
+                                colors = ButtonDefaults.buttonColors(containerColor = purpleAccentColor),
                                 shape = RoundedCornerShape(16.dp)
                             ) {
                                 Text("Save to '$suggestedName'", color = Color.White, fontSize = 13.sp)
@@ -1444,7 +1474,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                         }
                     }
 
-                    HorizontalDivider(color = Color(0xFF2E2E38))
+                    HorizontalDivider(color = dividerColor)
 
                     // Option 3: Loaded categories + Predefined Canned Categories in unified scrollable list
                     LazyColumn(
@@ -1452,7 +1482,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         item {
-                            Text("Active Playlist Categories:", color = Color(0xFFD0BCFF), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Active Playlist Categories:", color = purpleAccentColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                         items(loadedCategories) { cat ->
                             if (!cat.name.startsWith("Search:", ignoreCase = true)) {
@@ -1463,11 +1493,12 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         }
                                         showSaveStationDialog = false
                                     },
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B36)),
+                                    border = cardBorder,
+                                    colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFF2F2F7) else Color(0xFF2B2B36)),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                        Text(cat.name, color = Color.White, fontSize = 14.sp)
+                                        Text(cat.name, color = primaryTextColor, fontSize = 14.sp)
                                     }
                                 }
                             }
@@ -1475,7 +1506,7 @@ fun MainScreen(viewModel: MusicViewModel) {
 
                         item {
                             Spacer(modifier = Modifier.height(6.dp))
-                            Text("Predefined Canned Categories:", color = Color(0xFFD0BCFF), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Predefined Canned Categories:", color = purpleAccentColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
 
                         items(HardcodedDataSource.predefinedCategories) { cannedName ->
@@ -1488,11 +1519,12 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         }
                                         showSaveStationDialog = false
                                     },
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF22222C)),
+                                    border = cardBorder,
+                                    colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFE5E5EA) else Color(0xFF22222C)),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                        Text(cannedName, color = Color.LightGray, fontSize = 14.sp)
+                                        Text(cannedName, color = subTextColor, fontSize = 14.sp)
                                     }
                                 }
                             }
@@ -1501,7 +1533,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                 }
             },
             confirmButton = {},
-            containerColor = Color(0xFF1E1E24)
+            containerColor = cardBgColor
         )
     }
 
@@ -1530,7 +1562,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                 ) {
                     Text(
                         text = state.trackTitle ?: state.currentStation?.name ?: "Track Info",
-                        color = Color.White,
+                        color = primaryTextColor,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                         modifier = Modifier.weight(1f),
@@ -1538,7 +1570,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                         overflow = TextOverflow.Ellipsis
                     )
                     IconButton(onClick = { showTrackInfoDialog = false }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = subTextColor)
                     }
                 }
             },
@@ -1551,12 +1583,12 @@ fun MainScreen(viewModel: MusicViewModel) {
                 ) {
                     Text(
                         text = "Artist / Orchestra: ${state.artistName ?: "Live Radio Stream"}",
-                        color = Color(0xFFD0BCFF),
+                        color = purpleAccentColor,
                         fontWeight = FontWeight.Medium,
                         fontSize = 14.sp
                     )
 
-                    HorizontalDivider(color = Color(0xFF2E2E38))
+                    HorizontalDivider(color = dividerColor)
 
                     if (isFetching) {
                         Row(
@@ -1564,9 +1596,9 @@ fun MainScreen(viewModel: MusicViewModel) {
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            CircularProgressIndicator(color = Color(0xFFD0BCFF), modifier = Modifier.size(28.dp))
+                            CircularProgressIndicator(color = purpleAccentColor, modifier = Modifier.size(28.dp))
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text("Looking up composer & history...", color = Color.Gray, fontSize = 13.sp)
+                            Text("Looking up composer & history...", color = subTextColor, fontSize = 13.sp)
                         }
                     } else {
                         val result = trackInfoResult
@@ -1578,7 +1610,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 item {
                                     Text(
                                         text = result.description,
-                                        color = Color.LightGray,
+                                        color = primaryTextColor,
                                         fontSize = 13.sp,
                                         lineHeight = 18.sp
                                     )
@@ -1598,13 +1630,13 @@ fun MainScreen(viewModel: MusicViewModel) {
                             context.startActivity(intent)
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C5470)),
+                    colors = ButtonDefaults.buttonColors(containerColor = purpleAccentColor),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Search Google 🔍", color = Color.White)
                 }
             },
-            containerColor = Color(0xFF1E1E24)
+            containerColor = cardBgColor
         )
     }
 
@@ -1623,9 +1655,9 @@ fun MainScreen(viewModel: MusicViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Settings", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Settings", color = primaryTextColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     IconButton(onClick = { showSettingsDialog = false }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = subTextColor)
                     }
                 }
             },
@@ -1641,20 +1673,20 @@ fun MainScreen(viewModel: MusicViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Announce Category Names", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Speak category name aloud when changing categories", color = Color.Gray, fontSize = 12.sp)
+                            Text("Announce Category Names", color = primaryTextColor, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Speak category name aloud when changing categories", color = subTextColor, fontSize = 12.sp)
                         }
                         Switch(
                             checked = state.announceCategories,
                             onCheckedChange = { viewModel.onToggleAnnounceCategories() },
-                            colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFD0BCFF))
+                            colors = SwitchDefaults.colors(checkedThumbColor = purpleAccentColor)
                         )
                     }
 
                     // App Theme Selection Mode
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("App Theme Mode", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Select preferred visual appearance:", color = Color.Gray, fontSize = 12.sp)
+                        Text("App Theme Mode", color = primaryTextColor, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Select preferred visual appearance:", color = subTextColor, fontSize = 12.sp)
 
                         Row(
                             modifier = Modifier
@@ -1666,10 +1698,10 @@ fun MainScreen(viewModel: MusicViewModel) {
                             RadioButton(
                                 selected = state.themeMode == "DARK",
                                 onClick = { viewModel.onSetThemeMode("DARK") },
-                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFD0BCFF))
+                                colors = RadioButtonDefaults.colors(selectedColor = purpleAccentColor)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Always Dark Theme (Default)", color = Color.White, fontSize = 14.sp)
+                            Text("Always Dark Theme", color = primaryTextColor, fontSize = 14.sp)
                         }
 
                         Row(
@@ -1682,10 +1714,10 @@ fun MainScreen(viewModel: MusicViewModel) {
                             RadioButton(
                                 selected = state.themeMode == "LIGHT",
                                 onClick = { viewModel.onSetThemeMode("LIGHT") },
-                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFD0BCFF))
+                                colors = RadioButtonDefaults.colors(selectedColor = purpleAccentColor)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Always Light Theme", color = Color.White, fontSize = 14.sp)
+                            Text("Always Light Theme", color = primaryTextColor, fontSize = 14.sp)
                         }
 
                         Row(
@@ -1698,18 +1730,18 @@ fun MainScreen(viewModel: MusicViewModel) {
                             RadioButton(
                                 selected = state.themeMode == "AUTO",
                                 onClick = { viewModel.onSetThemeMode("AUTO") },
-                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFD0BCFF))
+                                colors = RadioButtonDefaults.colors(selectedColor = purpleAccentColor)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Auto (Match System Setting)", color = Color.White, fontSize = 14.sp)
+                            Text("Auto (Match System Setting - Default)", color = primaryTextColor, fontSize = 14.sp)
                         }
                     }
 
-                    HorizontalDivider(color = Color.DarkGray)
+                    HorizontalDivider(color = dividerColor)
 
                     // Bluetooth Headset Previous Button Action
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Bluetooth Headset Previous Button", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Bluetooth Headset Previous Button", color = primaryTextColor, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
 
                         Row(
                             modifier = Modifier
@@ -1721,10 +1753,10 @@ fun MainScreen(viewModel: MusicViewModel) {
                             RadioButton(
                                 selected = state.bluetoothBackAction == "NEXT_CATEGORY",
                                 onClick = { viewModel.onSetBluetoothBackAction("NEXT_CATEGORY") },
-                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFD0BCFF))
+                                colors = RadioButtonDefaults.colors(selectedColor = purpleAccentColor)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Next Category (Default)", color = Color.White, fontSize = 14.sp)
+                            Text("Next Category (Default)", color = primaryTextColor, fontSize = 14.sp)
                         }
 
                         Row(
@@ -1737,18 +1769,18 @@ fun MainScreen(viewModel: MusicViewModel) {
                             RadioButton(
                                 selected = state.bluetoothBackAction == "PREVIOUS_STATION",
                                 onClick = { viewModel.onSetBluetoothBackAction("PREVIOUS_STATION") },
-                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFD0BCFF))
+                                colors = RadioButtonDefaults.colors(selectedColor = purpleAccentColor)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Previous Station", color = Color.White, fontSize = 14.sp)
+                            Text("Previous Station", color = primaryTextColor, fontSize = 14.sp)
                         }
                     }
 
-                    HorizontalDivider(color = Color.DarkGray)
+                    HorizontalDivider(color = dividerColor)
 
                     // Search Station Limit
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Search Station Limit", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Search Station Limit", color = primaryTextColor, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1760,24 +1792,24 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 FilterChip(
                                     selected = isSelected,
                                     onClick = { viewModel.onSetSearchResultLimit(limitVal) },
-                                    label = { Text("$limitVal", fontSize = 12.sp, color = if (isSelected) Color.Black else Color.White) },
+                                    label = { Text("$limitVal", fontSize = 12.sp, color = if (isSelected) Color.White else primaryTextColor) },
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFFD0BCFF),
-                                        selectedLabelColor = Color.Black,
-                                        containerColor = Color(0xFF2E2E38),
-                                        labelColor = Color.White
+                                        selectedContainerColor = purpleAccentColor,
+                                        selectedLabelColor = Color.White,
+                                        containerColor = if (isLight) Color(0xFFE5E5EA) else Color(0xFF2E2E38),
+                                        labelColor = primaryTextColor
                                     )
                                 )
                             }
                         }
                     }
 
-                    HorizontalDivider(color = Color.DarkGray)
+                    HorizontalDivider(color = dividerColor)
 
                     // Station Startup Timeout
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Station Startup Timeout", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Wait time when starting a new station: ${state.stationTimeoutSeconds}s", color = Color.Gray, fontSize = 12.sp)
+                        Text("Station Startup Timeout", color = primaryTextColor, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Wait time when starting a new station: ${state.stationTimeoutSeconds}s", color = subTextColor, fontSize = 12.sp)
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1789,24 +1821,24 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 FilterChip(
                                     selected = isSelected,
                                     onClick = { viewModel.onSetStationTimeoutSeconds(sec) },
-                                    label = { Text(labelText, fontSize = 11.sp, color = if (isSelected) Color.Black else Color.White) },
+                                    label = { Text(labelText, fontSize = 11.sp, color = if (isSelected) Color.White else primaryTextColor) },
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFFD0BCFF),
-                                        selectedLabelColor = Color.Black,
-                                        containerColor = Color(0xFF2E2E38),
-                                        labelColor = Color.White
+                                        selectedContainerColor = purpleAccentColor,
+                                        selectedLabelColor = Color.White,
+                                        containerColor = if (isLight) Color(0xFFE5E5EA) else Color(0xFF2E2E38),
+                                        labelColor = primaryTextColor
                                     )
                                 )
                             }
                         }
                     }
 
-                    HorizontalDivider(color = Color.DarkGray)
+                    HorizontalDivider(color = dividerColor)
 
                     // While-Playing Dropout Timeout
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("While-Playing Stream Dropout Timeout", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Wait time if stream drops while playing: ${state.whilePlayingTimeoutSeconds}s", color = Color.Gray, fontSize = 12.sp)
+                        Text("While-Playing Stream Dropout Timeout", color = primaryTextColor, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Wait time if stream drops while playing: ${state.whilePlayingTimeoutSeconds}s", color = subTextColor, fontSize = 12.sp)
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1818,19 +1850,19 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 FilterChip(
                                     selected = isSelected,
                                     onClick = { viewModel.onSetWhilePlayingTimeoutSeconds(sec) },
-                                    label = { Text(labelText, fontSize = 11.sp, color = if (isSelected) Color.Black else Color.White) },
+                                    label = { Text(labelText, fontSize = 11.sp, color = if (isSelected) Color.White else primaryTextColor) },
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFFD0BCFF),
-                                        selectedLabelColor = Color.Black,
-                                        containerColor = Color(0xFF2E2E38),
-                                        labelColor = Color.White
+                                        selectedContainerColor = purpleAccentColor,
+                                        selectedLabelColor = Color.White,
+                                        containerColor = if (isLight) Color(0xFFE5E5EA) else Color(0xFF2E2E38),
+                                        labelColor = primaryTextColor
                                     )
                                 )
                             }
                         }
                     }
 
-                    HorizontalDivider(color = Color.DarkGray)
+                    HorizontalDivider(color = dividerColor)
 
                     // App Version with Secret 5-Tap Unlocking for Ride Log
                     Column(
@@ -1848,16 +1880,16 @@ fun MainScreen(viewModel: MusicViewModel) {
                             .padding(vertical = 4.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("App Version 2.0.0 (Build 200)", color = Color.Gray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text("App Version 2.0.0 (Build 200)", color = subTextColor, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                         if (!isRideLogUnlocked && versionTapCount in 1..4) {
-                            Text("Tap ${5 - versionTapCount} more times to unlock Ride Log", color = Color(0xFFD0BCFF), fontSize = 11.sp)
+                            Text("Tap ${5 - versionTapCount} more times to unlock Ride Log", color = purpleAccentColor, fontSize = 11.sp)
                         }
                     }
 
                     // Permanently Unlocked Ride Log Tools
                     if (isRideLogUnlocked) {
-                        HorizontalDivider(color = Color(0xFF383842))
-                        Text("Diagnostic Ride Log Tools 🛠️", color = Color(0xFFD0BCFF), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        HorizontalDivider(color = dividerColor)
+                        Text("Diagnostic Ride Log Tools 🛠️", color = purpleAccentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
 
                         Column(
                             modifier = Modifier.fillMaxWidth(),
@@ -1865,10 +1897,10 @@ fun MainScreen(viewModel: MusicViewModel) {
                         ) {
                             Button(
                                 onClick = { showExamineLogDialog = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF383842)),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isLight) Color(0xFFE5E5EA) else Color(0xFF383842)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Examine Log 📄", fontSize = 13.sp, color = Color.White)
+                                Text("Examine Log 📄", fontSize = 13.sp, color = primaryTextColor)
                             }
 
                             Button(
@@ -1878,7 +1910,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                         android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C5470)),
+                                colors = ButtonDefaults.buttonColors(containerColor = purpleAccentColor),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text("Email Log to Developer ✉️", fontSize = 13.sp, color = Color.White)
@@ -1888,7 +1920,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                 }
             },
             confirmButton = {},
-            containerColor = Color(0xFF1E1E24)
+            containerColor = cardBgColor
         )
 
         // Large Examine Ride Log Dialog
@@ -1902,9 +1934,9 @@ fun MainScreen(viewModel: MusicViewModel) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Examine Ride Log", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Examine Ride Log", color = primaryTextColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         IconButton(onClick = { showExamineLogDialog = false }, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = subTextColor)
                         }
                     }
                 },
@@ -1913,13 +1945,13 @@ fun MainScreen(viewModel: MusicViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(340.dp)
-                            .background(Color(0xFF121216), shape = RoundedCornerShape(8.dp))
+                            .background(if (isLight) Color(0xFFF2F2F7) else Color(0xFF121216), shape = RoundedCornerShape(8.dp))
                             .padding(8.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
                         Text(
                             text = logContent,
-                            color = Color.LightGray,
+                            color = primaryTextColor,
                             fontSize = 11.sp,
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                         )
@@ -1928,13 +1960,13 @@ fun MainScreen(viewModel: MusicViewModel) {
                 confirmButton = {
                     Button(
                         onClick = { showExamineLogDialog = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF383842)),
+                        colors = ButtonDefaults.buttonColors(containerColor = purpleAccentColor),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Close", color = Color.White, fontSize = 13.sp)
                     }
                 },
-                containerColor = Color(0xFF1E1E24)
+                containerColor = cardBgColor
             )
         }
     }
@@ -1949,17 +1981,17 @@ fun MainScreen(viewModel: MusicViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Cast Audio", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Cast Audio", color = primaryTextColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     IconButton(onClick = { showCastDialog = false }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = subTextColor)
                     }
                 }
             },
             text = {
-                Text("Searching for available Google Cast / Chromecast devices on your network...", color = Color.LightGray)
+                Text("Searching for available Google Cast / Chromecast devices on your network...", color = subTextColor)
             },
             confirmButton = {},
-            containerColor = Color(0xFF1E1E24)
+            containerColor = cardBgColor
         )
     }
 }
