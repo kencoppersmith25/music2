@@ -831,13 +831,15 @@ object PlaybackRepository {
         savePlaybackSelectionToDisk(appContext, safeCatIdx, safeStatIdx)
 
         RideLogger.log("COMMIT_STATE catIdx=$safeCatIdx statIdx=$safeStatIdx category='${category.name}' station='${station.name}' autoPlay=$autoPlay")
-        val castSess = getConnectedCastSession()
-        if (castSess != null) {
-            if (autoPlay) {
-                playOnCastSession(castSess, station)
+        scope.launch(Dispatchers.Main) {
+            val castSess = getConnectedCastSession()
+            if (castSess != null && castSess.isConnected) {
+                if (autoPlay) {
+                    playOnCastSession(castSess, station)
+                }
+            } else if (autoPlay) {
+                startStartupWatchdog(station)
             }
-        } else if (autoPlay) {
-            startStartupWatchdog(station)
         }
 
         _state.update {

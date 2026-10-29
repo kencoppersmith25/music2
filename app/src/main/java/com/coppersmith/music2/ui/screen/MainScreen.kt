@@ -1181,7 +1181,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                     // Option 3: Stations in Category Modal List
                     else if (stationsListExpanded && (state.currentCategory?.stations?.isNotEmpty() == true)) {
                         val stationsListState = rememberLazyListState()
-                        LaunchedEffect(stationsListExpanded, state.stationIndex, state.currentCategory?.stations?.size) {
+                        LaunchedEffect(stationsListExpanded) {
                             try {
                                 val currentStations = state.currentCategory?.stations
                                 if (stationsListExpanded && currentStations != null && state.stationIndex in currentStations.indices) {
