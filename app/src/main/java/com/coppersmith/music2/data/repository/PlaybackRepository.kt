@@ -692,6 +692,7 @@ object PlaybackRepository {
 
     fun onCastSessionConnected(session: com.google.android.gms.cast.framework.CastSession) {
         activeCastSession = session
+        _state.update { it.copy(isCasting = true) }
         RideLogger.log("CAST_CONNECTED session='${session.sessionId}'")
         val currentStat = _state.value.currentStation
         if (currentStat != null) {
@@ -701,9 +702,9 @@ object PlaybackRepository {
 
     fun onCastSessionDisconnected() {
         RideLogger.log("CAST_DISCONNECTED")
-        val wasCasting = (activeCastSession != null)
         activeCastSession = null
-        if (wasCasting && _state.value.isPlaying) {
+        _state.update { it.copy(isCasting = false) }
+        if (_state.value.isPlaying) {
             exoPlayer?.playWhenReady = true
             exoPlayer?.prepare()
             exoPlayer?.play()

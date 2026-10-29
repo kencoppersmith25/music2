@@ -565,7 +565,9 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                         releaseWakeLock()
                     }
 
-                    if (currentUrl != station.streamUrl || isErrorOrIdle) {
+                    if (state.isCasting) {
+                        player.pause()
+                    } else if (currentUrl != station.streamUrl || isErrorOrIdle) {
                         RideLogger.log("STATION_CHANGE_INITIATED station='${station.name}' url='${station.streamUrl}' category='${state.currentCategory?.name}'")
                         player.stop()
                         player.clearMediaItems()
