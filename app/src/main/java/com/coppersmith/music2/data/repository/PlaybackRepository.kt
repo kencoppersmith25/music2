@@ -488,6 +488,18 @@ object PlaybackRepository {
                     queryLower.contains("celtic") || queryLower.contains("irish") -> {
                         searchTags.addAll(listOf("Celtic", "Irish", "Dublin", "Galway", "Belfast", "Scotland"))
                     }
+                    queryLower.contains("60s") || queryLower.contains("1960") -> {
+                        searchTags.addAll(listOf("60s", "1960s", "sixties", "oldies", "60s gold", "60s pop", "60s rock"))
+                    }
+                    queryLower.contains("70s") || queryLower.contains("1970") -> {
+                        searchTags.addAll(listOf("70s", "1970s", "seventies", "70s pop", "70s rock", "70s disco"))
+                    }
+                    queryLower.contains("80s") || queryLower.contains("1980") -> {
+                        searchTags.addAll(listOf("80s", "1980s", "eighties", "80s pop", "80s rock", "synthpop"))
+                    }
+                    queryLower.contains("90s") || queryLower.contains("1990") -> {
+                        searchTags.addAll(listOf("90s", "1990s", "nineties", "90s pop", "90s rock", "grunge"))
+                    }
                     else -> {}
                 }
 
@@ -513,7 +525,7 @@ object PlaybackRepository {
                             rawStations.addAll(nameResults)
                             rawStations.addAll(byNameResults)
 
-                            if (rawStations.size >= 1) break
+                            if (rawStations.size >= searchLimit) break
                         } catch (_: Exception) {}
                     }
                 }
