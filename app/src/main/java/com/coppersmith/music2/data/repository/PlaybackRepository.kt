@@ -761,6 +761,7 @@ object PlaybackRepository {
 
     private fun playOnCastSession(session: com.google.android.gms.cast.framework.CastSession, station: Station) {
         scope.launch(Dispatchers.Main) {
+            val remoteMediaClient = session.remoteMediaClient ?: return@launch
             try {
                 exoPlayer?.pause()
 
@@ -768,59 +769,27 @@ object PlaybackRepository {
                     resolveStreamRedirectUrl(station.streamUrl)
                 }
 
-                val cp = castPlayer
-                if (cp != null && cp.isCastSessionAvailable) {
-                    val metadata = MediaMetadata.Builder()
-                        .setTitle(station.name)
-                        .setArtist(_state.value.currentCategory?.name ?: "Live Radio Stream")
-                        .setStation(station.name)
-                        .setIsPlayable(true)
-                        .setMediaType(MediaMetadata.MEDIA_TYPE_RADIO_STATION)
-                        .build()
+                val castMeta = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK)
+                castMeta.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, station.name)
+                castMeta.putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, _state.value.currentCategory?.name ?: "Live Radio Stream")
 
-                    val mediaItem = MediaItem.Builder()
-                        .setUri(resolvedUrl)
-                        .setMimeType(inferMimeType(resolvedUrl))
-                        .setMediaMetadata(metadata)
-                        .build()
+                val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(resolvedUrl)
+                    .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE)
+                    .setContentType("audio/mpeg")
+                    .setMetadata(castMeta)
+                    .build()
 
-                    cp.setMediaItem(mediaItem)
-                    cp.prepare()
-                    cp.play()
-                    RideLogger.log("CAST_PLAYER_PLAYING station='${station.name}' url='$resolvedUrl'")
-                } else {
-                    val remoteMediaClient = session.remoteMediaClient ?: return@launch
-                    val castMeta = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK)
-                    castMeta.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, station.name)
-                    castMeta.putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, _state.value.currentCategory?.name ?: "Live Radio Stream")
+                val request = com.google.android.gms.cast.MediaLoadRequestData.Builder()
+                    .setMediaInfo(mediaInfo)
+                    .setAutoplay(true)
+                    .build()
 
-                    val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(resolvedUrl)
-                        .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE)
-                        .setContentType("audio/mpeg")
-                        .setMetadata(castMeta)
-                        .build()
-
-                    val queueItem = com.google.android.gms.cast.MediaQueueItem.Builder(mediaInfo)
-                        .setAutoplay(true)
-                        .setPreloadTime(0.0)
-                        .build()
-
-                    val pendingResult = remoteMediaClient.queueLoad(
-                        arrayOf(queueItem),
-                        0,
-                        com.google.android.gms.cast.MediaStatus.REPEAT_MODE_REPEAT_OFF,
-                        0,
-                        null
-                    )
-                    pendingResult.setResultCallback { result ->
-                        if (result.status.isSuccess) {
-                            RideLogger.log("CAST_LOAD_SUCCESS station='${station.name}' url='$resolvedUrl'")
-                        } else {
-                            RideLogger.log("CAST_LOAD_FAILED code=${result.status.statusCode} msg='${result.status.statusMessage}'")
-                            try {
-                                remoteMediaClient.load(mediaInfo, true, 0)
-                            } catch (_: Exception) {}
-                        }
+                val pendingResult = remoteMediaClient.load(request)
+                pendingResult.setResultCallback { result ->
+                    if (result.status.isSuccess) {
+                        RideLogger.log("CAST_LOAD_SUCCESS station='${station.name}' url='$resolvedUrl'")
+                    } else {
+                        RideLogger.log("CAST_LOAD_FAILED code=${result.status.statusCode} msg='${result.status.statusMessage}'")
                     }
                 }
                 RideLogger.log("CAST_PLAYING_REMOTE station='${station.name}' url='$resolvedUrl'")
