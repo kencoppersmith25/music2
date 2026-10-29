@@ -730,42 +730,10 @@ object PlaybackRepository {
         }
     }
 
-    private fun resolveStreamInfo(originalUrl: String): Pair<String, String> {
-        return try {
-            val url = URL(originalUrl)
-            val conn = url.openConnection() as HttpURLConnection
-            conn.instanceFollowRedirects = true
-            conn.connectTimeout = 3000
-            conn.readTimeout = 3000
-            conn.setRequestProperty("User-Agent", "NoHandsRadio/1.1 Android")
-            conn.connect()
-            val finalUrl = conn.url.toString()
-            val rawContentType = conn.contentType?.lowercase()?.split(";")?.get(0)?.trim()
-            val mimeType = when {
-                !rawContentType.isNullOrBlank() && rawContentType != "text/html" && rawContentType != "text/plain" && rawContentType != "application/octet-stream" -> rawContentType
-                finalUrl.contains(".m3u8") || finalUrl.contains("m3u") -> "application/x-mpegURL"
-                finalUrl.contains(".aac") || finalUrl.contains("aac") -> "audio/aac"
-                finalUrl.contains(".ogg") -> "audio/ogg"
-                else -> "audio/mpeg"
-            }
-            conn.disconnect()
-            finalUrl to mimeType
-        } catch (_: Exception) {
-            val lower = originalUrl.lowercase()
-            val fallbackMime = when {
-                lower.contains(".m3u8") -> "application/x-mpegURL"
-                lower.contains(".aac") -> "audio/aac"
-                lower.contains(".ogg") -> "audio/ogg"
-                else -> "audio/mpeg"
-            }
-            originalUrl to fallbackMime
-        }
-    }
-
-    private fun inferMimeType(url: String): String {
+    private fun inferMimeTypeFast(url: String): String {
         val lower = url.lowercase()
         return when {
-            lower.contains(".m3u8") -> "application/x-mpegURL"
+            lower.contains(".m3u8") || lower.contains("m3u") -> "application/x-mpegURL"
             lower.contains(".mpd") -> "application/dash+xml"
             lower.contains(".aac") -> "audio/aac"
             lower.contains(".ogg") -> "audio/ogg"
@@ -779,17 +747,15 @@ object PlaybackRepository {
             try {
                 exoPlayer?.pause()
 
-                val (resolvedUrl, resolvedMime) = withContext(Dispatchers.IO) {
-                    resolveStreamInfo(station.streamUrl)
-                }
+                val mimeType = inferMimeTypeFast(station.streamUrl)
 
                 val castMeta = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK)
                 castMeta.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, station.name)
                 castMeta.putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, _state.value.currentCategory?.name ?: "Live Radio Stream")
 
-                val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(resolvedUrl)
+                val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(station.streamUrl)
                     .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_BUFFERED)
-                    .setContentType(resolvedMime)
+                    .setContentType(mimeType)
                     .setMetadata(castMeta)
                     .build()
 
@@ -799,19 +765,15 @@ object PlaybackRepository {
                     .setCurrentTime(0)
                     .build()
 
-                try {
-                    remoteMediaClient.stop()
-                } catch (_: Exception) {}
-
                 val pendingResult = remoteMediaClient.load(request)
                 pendingResult.setResultCallback { result ->
                     if (result.status.isSuccess) {
-                        RideLogger.log("CAST_LOAD_SUCCESS station='${station.name}' mime='$resolvedMime' url='$resolvedUrl'")
+                        RideLogger.log("CAST_LOAD_SUCCESS station='${station.name}' url='${station.streamUrl}'")
                     } else {
                         RideLogger.log("CAST_LOAD_FAILED code=${result.status.statusCode} msg='${result.status.statusMessage}'")
                     }
                 }
-                RideLogger.log("CAST_PLAYING_REMOTE station='${station.name}' mime='$resolvedMime' url='$resolvedUrl'")
+                RideLogger.log("CAST_PLAYING_REMOTE station='${station.name}' url='${station.streamUrl}'")
             } catch (e: Exception) {
                 RideLogger.log("CAST_PLAY_ERROR error='${e.message}'")
             }
