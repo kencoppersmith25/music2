@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.coppersmith.music2.data.repository
 
 import android.content.Context
@@ -40,6 +42,7 @@ object PlaybackRepository {
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state.asStateFlow()
     var exoPlayer: ExoPlayer? = null
+    var castPlayer: androidx.media3.cast.CastPlayer? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val playlist = mutableListOf<Category>()
 
@@ -745,9 +748,19 @@ object PlaybackRepository {
         }
     }
 
+    private fun inferMimeType(url: String): String {
+        val lower = url.lowercase()
+        return when {
+            lower.contains(".m3u8") -> "application/x-mpegURL"
+            lower.contains(".mpd") -> "application/dash+xml"
+            lower.contains(".aac") -> "audio/aac"
+            lower.contains(".ogg") -> "audio/ogg"
+            else -> "audio/mpeg"
+        }
+    }
+
     private fun playOnCastSession(session: com.google.android.gms.cast.framework.CastSession, station: Station) {
         scope.launch(Dispatchers.Main) {
-            val remoteMediaClient = session.remoteMediaClient ?: return@launch
             try {
                 exoPlayer?.pause()
 
@@ -755,36 +768,59 @@ object PlaybackRepository {
                     resolveStreamRedirectUrl(station.streamUrl)
                 }
 
-                val mediaMetadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK)
-                mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, station.name)
-                mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, _state.value.currentCategory?.name ?: "Live Radio Stream")
+                val cp = castPlayer
+                if (cp != null && cp.isCastSessionAvailable) {
+                    val metadata = MediaMetadata.Builder()
+                        .setTitle(station.name)
+                        .setArtist(_state.value.currentCategory?.name ?: "Live Radio Stream")
+                        .setStation(station.name)
+                        .setIsPlayable(true)
+                        .setMediaType(MediaMetadata.MEDIA_TYPE_RADIO_STATION)
+                        .build()
 
-                val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(resolvedUrl)
-                    .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE)
-                    .setContentType("audio/mpeg")
-                    .setMetadata(mediaMetadata)
-                    .build()
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(resolvedUrl)
+                        .setMimeType(inferMimeType(resolvedUrl))
+                        .setMediaMetadata(metadata)
+                        .build()
 
-                val queueItem = com.google.android.gms.cast.MediaQueueItem.Builder(mediaInfo)
-                    .setAutoplay(true)
-                    .setPreloadTime(0.0)
-                    .build()
+                    cp.setMediaItem(mediaItem)
+                    cp.prepare()
+                    cp.play()
+                    RideLogger.log("CAST_PLAYER_PLAYING station='${station.name}' url='$resolvedUrl'")
+                } else {
+                    val remoteMediaClient = session.remoteMediaClient ?: return@launch
+                    val castMeta = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK)
+                    castMeta.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, station.name)
+                    castMeta.putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, _state.value.currentCategory?.name ?: "Live Radio Stream")
 
-                val pendingResult = remoteMediaClient.queueLoad(
-                    arrayOf(queueItem),
-                    0,
-                    com.google.android.gms.cast.MediaStatus.REPEAT_MODE_REPEAT_OFF,
-                    0,
-                    null
-                )
-                pendingResult.setResultCallback { result ->
-                    if (result.status.isSuccess) {
-                        RideLogger.log("CAST_LOAD_SUCCESS station='${station.name}' url='$resolvedUrl'")
-                    } else {
-                        RideLogger.log("CAST_LOAD_FAILED code=${result.status.statusCode} msg='${result.status.statusMessage}'")
-                        try {
-                            remoteMediaClient.load(mediaInfo, true, 0)
-                        } catch (_: Exception) {}
+                    val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(resolvedUrl)
+                        .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE)
+                        .setContentType("audio/mpeg")
+                        .setMetadata(castMeta)
+                        .build()
+
+                    val queueItem = com.google.android.gms.cast.MediaQueueItem.Builder(mediaInfo)
+                        .setAutoplay(true)
+                        .setPreloadTime(0.0)
+                        .build()
+
+                    val pendingResult = remoteMediaClient.queueLoad(
+                        arrayOf(queueItem),
+                        0,
+                        com.google.android.gms.cast.MediaStatus.REPEAT_MODE_REPEAT_OFF,
+                        0,
+                        null
+                    )
+                    pendingResult.setResultCallback { result ->
+                        if (result.status.isSuccess) {
+                            RideLogger.log("CAST_LOAD_SUCCESS station='${station.name}' url='$resolvedUrl'")
+                        } else {
+                            RideLogger.log("CAST_LOAD_FAILED code=${result.status.statusCode} msg='${result.status.statusMessage}'")
+                            try {
+                                remoteMediaClient.load(mediaInfo, true, 0)
+                            } catch (_: Exception) {}
+                        }
                     }
                 }
                 RideLogger.log("CAST_PLAYING_REMOTE station='${station.name}' url='$resolvedUrl'")
