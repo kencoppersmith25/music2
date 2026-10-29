@@ -730,23 +730,35 @@ object PlaybackRepository {
         }
     }
 
-    private fun resolveStreamRedirectUrl(originalUrl: String): String {
+    private fun resolveStreamInfo(originalUrl: String): Pair<String, String> {
         return try {
             val url = URL(originalUrl)
             val conn = url.openConnection() as HttpURLConnection
-            conn.instanceFollowRedirects = false
+            conn.instanceFollowRedirects = true
             conn.connectTimeout = 3000
             conn.readTimeout = 3000
             conn.setRequestProperty("User-Agent", "NoHandsRadio/1.1 Android")
-            val code = conn.responseCode
-            if (code in 300..399) {
-                val loc = conn.getHeaderField("Location")
-                if (!loc.isNullOrBlank()) loc else originalUrl
-            } else {
-                originalUrl
+            conn.connect()
+            val finalUrl = conn.url.toString()
+            val rawContentType = conn.contentType?.lowercase()?.split(";")?.get(0)?.trim()
+            val mimeType = when {
+                !rawContentType.isNullOrBlank() && rawContentType != "text/html" && rawContentType != "text/plain" && rawContentType != "application/octet-stream" -> rawContentType
+                finalUrl.contains(".m3u8") || finalUrl.contains("m3u") -> "application/x-mpegURL"
+                finalUrl.contains(".aac") || finalUrl.contains("aac") -> "audio/aac"
+                finalUrl.contains(".ogg") -> "audio/ogg"
+                else -> "audio/mpeg"
             }
+            conn.disconnect()
+            finalUrl to mimeType
         } catch (_: Exception) {
-            originalUrl
+            val lower = originalUrl.lowercase()
+            val fallbackMime = when {
+                lower.contains(".m3u8") -> "application/x-mpegURL"
+                lower.contains(".aac") -> "audio/aac"
+                lower.contains(".ogg") -> "audio/ogg"
+                else -> "audio/mpeg"
+            }
+            originalUrl to fallbackMime
         }
     }
 
@@ -767,8 +779,8 @@ object PlaybackRepository {
             try {
                 exoPlayer?.pause()
 
-                val resolvedUrl = withContext(Dispatchers.IO) {
-                    resolveStreamRedirectUrl(station.streamUrl)
+                val (resolvedUrl, resolvedMime) = withContext(Dispatchers.IO) {
+                    resolveStreamInfo(station.streamUrl)
                 }
 
                 val castMeta = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK)
@@ -777,7 +789,7 @@ object PlaybackRepository {
 
                 val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(resolvedUrl)
                     .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_BUFFERED)
-                    .setContentType("audio/mpeg")
+                    .setContentType(resolvedMime)
                     .setMetadata(castMeta)
                     .build()
 
@@ -794,12 +806,12 @@ object PlaybackRepository {
                 val pendingResult = remoteMediaClient.load(request)
                 pendingResult.setResultCallback { result ->
                     if (result.status.isSuccess) {
-                        RideLogger.log("CAST_LOAD_SUCCESS station='${station.name}' url='$resolvedUrl'")
+                        RideLogger.log("CAST_LOAD_SUCCESS station='${station.name}' mime='$resolvedMime' url='$resolvedUrl'")
                     } else {
                         RideLogger.log("CAST_LOAD_FAILED code=${result.status.statusCode} msg='${result.status.statusMessage}'")
                     }
                 }
-                RideLogger.log("CAST_PLAYING_REMOTE station='${station.name}' url='$resolvedUrl'")
+                RideLogger.log("CAST_PLAYING_REMOTE station='${station.name}' mime='$resolvedMime' url='$resolvedUrl'")
             } catch (e: Exception) {
                 RideLogger.log("CAST_PLAY_ERROR error='${e.message}'")
             }
