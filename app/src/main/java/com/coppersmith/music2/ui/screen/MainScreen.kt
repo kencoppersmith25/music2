@@ -6,6 +6,7 @@ import android.net.Uri
 import com.coppersmith.music2.R
 import com.coppersmith.music2.cast.GoogleCastIconButton
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -103,9 +104,9 @@ fun MainScreen(viewModel: MusicViewModel) {
     val focusManager = LocalFocusManager.current
 
     val loadedCategories = viewModel.onGetAllCategories().toList()
-    val totalCategories = loadedCategories.size.coerceAtLeast(1)
-    val currentCategoryNum = (state.categoryIndex + 1).coerceAtLeast(1)
-    val currentCategoryName = state.currentCategory?.name ?: "Mixed"
+    val totalCategories = loadedCategories.size
+    val currentCategoryNum = if (totalCategories > 0) (state.categoryIndex + 1).coerceIn(1, totalCategories) else 0
+    val currentCategoryName = state.currentCategory?.name ?: if (loadedCategories.isEmpty()) "No Categories Available" else "Mixed"
 
     // Master list of all predefined categories
     val masterCategories = remember { HardcodedDataSource.predefinedCategories }
@@ -162,226 +163,831 @@ fun MainScreen(viewModel: MusicViewModel) {
     }
 
     Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() }
-            ) {
-                dropdownExpanded = false
-                focusManager.clearFocus()
-                keyboardController?.hide()
-            },
+        modifier = Modifier.fillMaxSize(),
         color = bgColor
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top Section: Branding, Utility Icons, Search & Category Status
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Main Content Layout
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Top Row: App identity & utility icons
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 18.dp, bottom = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // Top Section: Branding, Utility Icons, Search & Category Status
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFFFFFFF) else Color(0xFF000000)),
-                        modifier = Modifier.size(54.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.app_logo),
-                                contentDescription = "No Hands Radio Logo",
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                    }
-
+                    // Top Row: App identity & utility icons
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 18.dp, bottom = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = {
-                            com.coppersmith.music2.ads.AdManager.maybeShowInterstitial(
-                                context as? Activity,
-                                com.coppersmith.music2.ads.AdReason.OPEN_SETTINGS
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFFFFFFF) else Color(0xFF000000)),
+                            modifier = Modifier.size(54.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
                             ) {
-                                showSettingsDialog = true
+                                Image(
+                                    painter = painterResource(id = R.drawable.app_logo),
+                                    contentDescription = "No Hands Radio Logo",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize()
+                                )
                             }
-                        }) {
-                            Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
                         }
-                        GoogleCastIconButton()
-                        IconButton(onClick = { (context as? Activity)?.finish() }) {
-                            Icon(imageVector = Icons.Default.PowerSettingsNew, contentDescription = "Exit App", tint = Color(0xFFD32F2F))
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = {
+                                com.coppersmith.music2.ads.AdManager.maybeShowInterstitial(
+                                    context as? Activity,
+                                    com.coppersmith.music2.ads.AdReason.OPEN_SETTINGS
+                                ) {
+                                    showSettingsDialog = true
+                                }
+                            }) {
+                                Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                            }
+                            GoogleCastIconButton()
+                            IconButton(onClick = { (context as? Activity)?.finish() }) {
+                                Icon(imageVector = Icons.Default.PowerSettingsNew, contentDescription = "Exit App", tint = Color(0xFFD32F2F))
+                            }
                         }
                     }
-                }
 
-                // Single-Line Rounded Search Box with Dropdown Menu
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                    // Single-Line Rounded Search Box
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
                         ) {
-                            TextField(
-                                value = searchQuery,
-                                onValueChange = { newValue ->
-                                    searchQuery = newValue
-                                    dropdownExpanded = true
-                                },
-                                placeholder = {
-                                    Text(
-                                        "Search category or genre...",
-                                        color = Color.Gray,
-                                        fontSize = 13.sp
-                                    )
-                                },
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent,
-                                    disabledContainerColor = Color.Transparent,
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent,
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White
-                                ),
+                            Row(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .onFocusChanged { focusState ->
-                                        if (focusState.isFocused) {
-                                            dropdownExpanded = true
-                                        }
+                                    .fillMaxWidth()
+                                    .height(50.dp)
+                                    .padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                TextField(
+                                    value = searchQuery,
+                                    onValueChange = { newValue ->
+                                        searchQuery = newValue
+                                        dropdownExpanded = true
                                     },
-                                singleLine = true,
-                                textStyle = TextStyle(fontSize = 14.sp),
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                keyboardActions = KeyboardActions(
-                                    onSearch = {
-                                        if (searchQuery.isNotBlank()) {
-                                            onPerformCategorySearch(searchQuery)
+                                    placeholder = {
+                                        Text(
+                                            "Search category or genre...",
+                                            color = Color.Gray,
+                                            fontSize = 13.sp
+                                        )
+                                    },
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        disabledContainerColor = Color.Transparent,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .onFocusChanged { focusState ->
+                                            if (focusState.isFocused) {
+                                                dropdownExpanded = true
+                                            }
+                                        },
+                                    singleLine = true,
+                                    textStyle = TextStyle(fontSize = 14.sp),
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                    keyboardActions = KeyboardActions(
+                                        onSearch = {
+                                            if (searchQuery.isNotBlank()) {
+                                                onPerformCategorySearch(searchQuery)
+                                            }
+                                        }
+                                    )
+                                )
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    if (searchQuery.isNotEmpty() || dropdownExpanded) {
+                                        IconButton(
+                                            onClick = {
+                                                searchQuery = ""
+                                                dropdownExpanded = false
+                                                focusManager.clearFocus()
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Clear & Close Dropdown",
+                                                tint = Color.Gray,
+                                                modifier = Modifier.size(18.dp)
+                                            )
                                         }
                                     }
-                                )
-                            )
 
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                if (searchQuery.isNotEmpty() || dropdownExpanded) {
                                     IconButton(
                                         onClick = {
-                                            searchQuery = ""
-                                            dropdownExpanded = false
-                                            focusManager.clearFocus()
+                                            dropdownExpanded = !dropdownExpanded
                                         },
                                         modifier = Modifier.size(32.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "Clear & Close Dropdown",
-                                            tint = Color.Gray,
-                                            modifier = Modifier.size(18.dp)
+                                            imageVector = if (dropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                                            contentDescription = "Toggle Dropdown",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(24.dp)
                                         )
                                     }
-                                }
 
-                                IconButton(
-                                    onClick = {
-                                        dropdownExpanded = !dropdownExpanded
-                                    },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = if (dropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
-                                        contentDescription = "Toggle Dropdown",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = {
-                                        if (searchQuery.isNotBlank()) {
-                                            onPerformCategorySearch(searchQuery)
-                                        } else {
-                                            dropdownExpanded = !dropdownExpanded
-                                        }
-                                    },
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = "Search Category",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(22.dp)
-                                    )
+                                    IconButton(
+                                        onClick = {
+                                            if (searchQuery.isNotBlank()) {
+                                                onPerformCategorySearch(searchQuery)
+                                            } else {
+                                                dropdownExpanded = !dropdownExpanded
+                                            }
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Search,
+                                            contentDescription = "Search Category",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // In-layout Dropdown List underneath search bar
-                    if (dropdownExpanded && filteredCategories.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(6.dp))
+                    // 2-Row Horizontally Scrollable Category Chips
+                    val row1Chips = listOf(
+                        "Classical", "Jazz", "Blues", "60s", "70s", "80s", "90s",
+                        "Rock", "Pop", "Country", "Soul", "Folk", "Gospel", "Big Band"
+                    )
+                    val row2Chips = listOf(
+                        "African", "Hawaiian", "Celtic", "Electronic", "World", "College", "Latin",
+                        "Reggae", "Metal", "Oldies", "Chillout", "Soundtrack", "Talk", "News"
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            row1Chips.forEach { chipName ->
+                                val isSelected = state.currentCategory?.name?.equals(chipName, ignoreCase = true) == true
+                                Surface(
+                                    onClick = { onPerformCategorySearch(chipName) },
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = if (isSelected) Color(0xFF5C5470) else Color(0xFF1E1E24),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier.padding(horizontal = 14.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(text = chipName, color = Color.White, fontSize = 13.sp)
+                                    }
+                                }
+                            }
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            row2Chips.forEach { chipName ->
+                                val isSelected = state.currentCategory?.name?.equals(chipName, ignoreCase = true) == true
+                                Surface(
+                                    onClick = { onPerformCategorySearch(chipName) },
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = if (isSelected) Color(0xFF5C5470) else Color(0xFF1E1E24),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier.padding(horizontal = 14.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(text = chipName, color = Color.White, fontSize = 13.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Empty Playlist / No Categories Banner
+                    if (loadedCategories.isEmpty() && !state.isLoading) {
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 200.dp),
+                                .padding(vertical = 4.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "📻 No Categories Available",
+                                    color = Color.White,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "You have deleted all categories. Type a genre or radio station in the search bar above to load new categories!",
+                                    color = Color.LightGray,
+                                    fontSize = 13.sp,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+
+                    // Active Category Status Bar
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // Left side: Clickable Category Name (with Marquee) & Subtitle (Category X of Y)
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable {
+                                            dropdownExpanded = false
+                                            categoriesListExpanded = !categoriesListExpanded
+                                            stationsListExpanded = false
+                                            focusManager.clearFocus()
+                                            keyboardController?.hide()
+                                        }
+                                ) {
+                                    val categoryTitle = when {
+                                        state.isLoading && state.searchingCategoryName != null -> "Searching for '${state.searchingCategoryName}'..."
+                                        state.isLoading -> "Loading $currentCategoryName..."
+                                        else -> currentCategoryName
+                                    }
+
+                                    Text(
+                                        text = categoryTitle,
+                                        color = Color(0xFFD0BCFF),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                                    )
+
+                                    if (!state.isLoading) {
+                                        Text(
+                                            text = if (totalCategories > 0) "Category $currentCategoryNum of $totalCategories" else "No Categories",
+                                            color = Color.Gray,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Normal,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Text List icon to bring down all stations in current category
+                                    IconButton(
+                                        onClick = {
+                                            stationsListExpanded = !stationsListExpanded
+                                            categoriesListExpanded = false
+                                            dropdownExpanded = false
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.FormatListBulleted,
+                                            contentDescription = "Stations List",
+                                            tint = if (stationsListExpanded) Color(0xFFD0BCFF) else Color.White
+                                        )
+                                    }
+
+                                    // Delete category button
+                                    IconButton(
+                                        onClick = {
+                                            if (state.categoryIndex >= 0) {
+                                                showDeleteCategoryDialog = true
+                                            }
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete Category",
+                                            tint = Color.White
+                                        )
+                                    }
+
+                                    // Category Skip Toggle Arrow (Green long arrow vs Red X overlay)
+                                    val isCatSkipped = state.skippedCategoryIds.contains(state.currentCategory?.id)
+                                    ArrowWithRedXIcon(
+                                        isContinuousNav = !isCatSkipped,
+                                        onClick = {
+                                            if (state.categoryIndex >= 0) {
+                                                viewModel.onToggleCategorySkipped(state.categoryIndex)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                            if (state.isLoading) {
+                                LinearProgressIndicator(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = Color(0xFFD0BCFF),
+                                    trackColor = Color.Transparent
+                                )
+                            }
+                        }
+                    }
+
+                    // Search Error / No Results Banner
+                    if (state.searchError != null) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF4A1A1A))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = state.searchError ?: "",
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    onClick = { viewModel.onClearSearchError() },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Dismiss",
+                                        tint = Color.LightGray,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Middle: Compact Now Playing Card (Docked snugly under Category Card)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp)
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) {
+                            dropdownExpanded = false
+                            categoriesListExpanded = false
+                            stationsListExpanded = false
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                        },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            // Station Name with (1 of 5) and Auto-Marquee
+                            val totalStations = state.currentCategory?.stations?.size ?: 0
+                            val currentStationNum = (state.stationIndex + 1).coerceAtLeast(1)
+                            val stationDisplayName = state.currentStation?.name ?: "Select a station"
+                            Text(
+                                text = if (totalStations > 0) "$stationDisplayName ($currentStationNum of $totalStations)" else stationDisplayName,
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                            )
+
+                            // Music / Song Title with Auto-Marquee
+                            val songTitle = state.trackTitle ?: stationDisplayName
+                            Text(
+                                text = "Title: $songTitle",
+                                color = Color(0xFFD0BCFF),
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                            )
+
+                            // Musician / Singer / Artist with Auto-Marquee
+                            val artist = state.artistName ?: "Live Radio Stream"
+                            Text(
+                                text = "Artist: $artist",
+                                color = Color.LightGray,
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Mini VU Meter & Custom Navigation Action Buttons
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            MiniVuMeter(isPlaying = state.isPlaying)
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Save Station to Category Button
+                                IconButton(
+                                    onClick = { showSaveStationDialog = true },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.BookmarkAdd,
+                                        contentDescription = "Save Station to Category",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                // Delete Station / Trash Can Button
+                                IconButton(
+                                    onClick = { showDeleteStationDialog = true },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.DeleteOutline,
+                                        contentDescription = "Delete Station",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                // Station Skip Arrow with Red X Icon
+                                val isCurrentStatSkipped = state.currentStation?.let { state.skippedStationIds.contains(it.id) } == true
+                                ArrowWithRedXIcon(
+                                    isContinuousNav = !isCurrentStatSkipped,
+                                    onClick = {
+                                        state.currentStation?.let { station ->
+                                            viewModel.onToggleStationSkipped(station.id)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Inline Composer & History Summary Card (Auto-populated on Main Screen)
+                var autoTrackInfo by remember { mutableStateOf<TrackInfoResult?>(null) }
+                var autoFetching by remember { mutableStateOf(false) }
+
+                LaunchedEffect(state.currentStation, state.trackTitle, state.artistName) {
+                    if (state.trackTitle != null || state.artistName != null || state.currentStation != null) {
+                        autoFetching = true
+                        autoTrackInfo = viewModel.fetchTrackDetailsOnline(
+                            artist = state.artistName,
+                            title = state.trackTitle,
+                            stationName = state.currentStation?.name
+                        )
+                        autoFetching = false
+                    }
+                }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 100.dp, max = 220.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFFFFFFF) else Color(0xFF1B1B22))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val searchReq = autoTrackInfo?.query ?: "${state.artistName ?: ""} ${state.trackTitle ?: ""}".trim()
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Composer & Piece Information 📖",
+                                color = Color(0xFFD0BCFF),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Surface(
+                                onClick = {
+                                    if (searchReq.isNotBlank()) {
+                                        val url = "https://www.google.com/search?q=" + URLEncoder.encode(searchReq, "UTF-8")
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                        context.startActivity(intent)
+                                    }
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFF383842),
+                                modifier = Modifier.height(24.dp)
+                            ) {
+                                Box(modifier = Modifier.padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
+                                    Text("Search Google 🔍", color = Color(0xFFD0BCFF), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        }
+
+                        // Interactive Google Search Chips for Composer, Piece, and Station
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val composer = autoTrackInfo?.composerQuery ?: state.artistName
+                            if (!composer.isNullOrBlank() && composer != "Live Radio Stream") {
+                                FilterChip(
+                                    selected = false,
+                                    onClick = {
+                                        val url = "https://www.google.com/search?q=" + URLEncoder.encode(composer, "UTF-8")
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                    },
+                                    label = { Text("🔍 Composer: $composer", fontSize = 11.sp, color = Color(0xFFD0BCFF)) },
+                                    colors = FilterChipDefaults.filterChipColors(containerColor = Color(0xFF2E2E38))
+                                )
+                            }
+
+                            val piece = autoTrackInfo?.pieceQuery ?: state.trackTitle
+                            if (!piece.isNullOrBlank()) {
+                                FilterChip(
+                                    selected = false,
+                                    onClick = {
+                                        val url = "https://www.google.com/search?q=" + URLEncoder.encode(piece, "UTF-8")
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                    },
+                                    label = { Text("🎵 Piece: $piece", fontSize = 11.sp, color = Color(0xFFD0BCFF)) },
+                                    colors = FilterChipDefaults.filterChipColors(containerColor = Color(0xFF2E2E38))
+                                )
+                            }
+
+                            val station = autoTrackInfo?.stationQuery ?: state.currentStation?.name
+                            if (!station.isNullOrBlank()) {
+                                FilterChip(
+                                    selected = false,
+                                    onClick = {
+                                        val url = "https://www.google.com/search?q=" + URLEncoder.encode("$station radio station", "UTF-8")
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                    },
+                                    label = { Text("📻 Station: $station", fontSize = 11.sp, color = Color(0xFFD0BCFF)) },
+                                    colors = FilterChipDefaults.filterChipColors(containerColor = Color(0xFF2E2E38))
+                                )
+                            }
+                        }
+
+                        HorizontalDivider(color = Color(0xFF2B2B36), thickness = 1.dp)
+
+                        if (autoFetching) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                CircularProgressIndicator(color = Color(0xFFD0BCFF), modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Looking up composer info...", color = Color.Gray, fontSize = 12.sp)
+                            }
+                        } else {
+                            val info = autoTrackInfo
+                            if (info != null && info.description.isNotBlank()) {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    item {
+                                        Text(
+                                            text = info.description,
+                                            color = if (isLight) Color(0xFF2C2C2E) else Color.LightGray,
+                                            fontSize = 12.sp,
+                                            lineHeight = 16.sp
+                                        )
+                                    }
+                                }
+                            } else {
+                                Text(
+                                    text = "No automatic summary found for '$searchReq'. Tap Google Search chips above for recordings and composer details.",
+                                    color = Color.Gray,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Bottom Section: Playback Control Deck & Ad Banner
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Playback Control Deck (5 buttons)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { viewModel.onPreviousCategoryClicked() },
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardDoubleArrowLeft,
+                                contentDescription = "Previous Category",
+                                tint = Color.White,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { viewModel.onPreviousClicked() },
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                                contentDescription = "Previous Station",
+                                tint = Color.White,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+
+                        val buttonColor = if (state.isPlaying) Color(0xFFD32F2F) else Color(0xFF388E3C)
+                        Button(
+                            onClick = { viewModel.onPlayPauseClicked() },
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
+                            modifier = Modifier.size(72.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (state.isPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                contentDescription = if (state.isPlaying) "Stop" else "Play",
+                                tint = Color.White,
+                                modifier = Modifier.size(34.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { viewModel.onNextClicked() },
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = "Next Station",
+                                tint = Color.White,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { viewModel.onNextCategoryClicked() },
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardDoubleArrowRight,
+                                contentDescription = "Next Category",
+                                tint = Color.White,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+                    }
+
+                    // Ad Banner at the very bottom
+                    com.coppersmith.music2.ads.AdBanner(
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            // MODAL OVERLAY & DIMMED BACKDROP FOR DROPDOWN / CATEGORY LIST / STATION LIST
+            if (dropdownExpanded || categoriesListExpanded || stationsListExpanded) {
+                // Dimmed Semi-Transparent Backdrop Scrim
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.70f))
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) {
+                            dropdownExpanded = false
+                            categoriesListExpanded = false
+                            stationsListExpanded = false
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                        }
+                )
+
+                // Modal Window Floating on Top
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 110.dp)
+                        .align(Alignment.TopCenter)
+                ) {
+                    // Option 1: Search Category Dropdown List
+                    if (dropdownExpanded && filteredCategories.isNotEmpty()) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 320.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            border = BorderStroke(1.5.dp, Color(0xFFD0BCFF)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF22222B))
                         ) {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                        .padding(horizontal = 16.dp, vertical = 10.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
                                         text = "Select Category / Genre:",
-                                        color = Color.Gray,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
+                                        color = Color(0xFFD0BCFF),
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
                                     )
                                     IconButton(
                                         onClick = {
                                             dropdownExpanded = false
                                             focusManager.clearFocus()
                                         },
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(28.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Close,
                                             contentDescription = "Close Dropdown",
                                             tint = Color.Gray,
-                                            modifier = Modifier.size(16.dp)
+                                            modifier = Modifier.size(18.dp)
                                         )
                                     }
                                 }
@@ -389,7 +995,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 LazyColumn(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 2.dp)
+                                        .padding(vertical = 4.dp)
                                 ) {
                                     items(filteredCategories) { category ->
                                         Box(
@@ -398,12 +1004,12 @@ fun MainScreen(viewModel: MusicViewModel) {
                                                 .clickable {
                                                     onPerformCategorySearch(category)
                                                 }
-                                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                                .padding(horizontal = 16.dp, vertical = 10.dp)
                                         ) {
                                             Text(
                                                 text = category,
                                                 color = Color.White,
-                                                fontSize = 14.sp,
+                                                fontSize = 15.sp,
                                                 fontWeight = FontWeight.Medium
                                             )
                                         }
@@ -412,828 +1018,249 @@ fun MainScreen(viewModel: MusicViewModel) {
                             }
                         }
                     }
-                }
 
-                // 2-Row Horizontally Scrollable Category Chips
-                val row1Chips = listOf(
-                    "Classical", "Jazz", "Blues", "60s", "70s", "80s", "90s",
-                    "Rock", "Pop", "Country", "Soul", "Folk", "Gospel", "Big Band"
-                )
-                val row2Chips = listOf(
-                    "African", "Hawaiian", "Celtic", "Electronic", "World", "College", "Latin",
-                    "Reggae", "Metal", "Oldies", "Chillout", "Soundtrack", "Talk", "News"
-                )
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row1Chips.forEach { chipName ->
-                            val isSelected = state.currentCategory?.name?.equals(chipName, ignoreCase = true) == true
-                            Surface(
-                                onClick = { onPerformCategorySearch(chipName) },
-                                shape = RoundedCornerShape(16.dp),
-                                color = if (isSelected) Color(0xFF5C5470) else Color(0xFF1E1E24),
-                                modifier = Modifier.height(32.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier.padding(horizontal = 14.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(text = chipName, color = Color.White, fontSize = 13.sp)
+                    // Option 2: All Loaded Categories Modal List
+                    else if (categoriesListExpanded && loadedCategories.isNotEmpty()) {
+                        val categoriesListState = rememberLazyListState()
+                        LaunchedEffect(categoriesListExpanded, state.categoryIndex, loadedCategories.size) {
+                            try {
+                                if (categoriesListExpanded && state.categoryIndex in loadedCategories.indices) {
+                                    categoriesListState.scrollToItem(state.categoryIndex)
                                 }
-                            }
+                            } catch (_: Exception) {}
                         }
-                    }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row2Chips.forEach { chipName ->
-                            val isSelected = state.currentCategory?.name?.equals(chipName, ignoreCase = true) == true
-                            Surface(
-                                onClick = { onPerformCategorySearch(chipName) },
-                                shape = RoundedCornerShape(16.dp),
-                                color = if (isSelected) Color(0xFF5C5470) else Color(0xFF1E1E24),
-                                modifier = Modifier.height(32.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier.padding(horizontal = 14.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(text = chipName, color = Color.White, fontSize = 13.sp)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Empty Playlist / No Categories Banner
-                if (loadedCategories.isEmpty() && !state.isLoading) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
-                    ) {
-                        Column(
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                .heightIn(max = 340.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            border = BorderStroke(1.5.dp, Color(0xFFD0BCFF)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF22222B))
                         ) {
-                            Text(
-                                text = "📻 No Categories Available",
-                                color = Color.White,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "You have deleted all categories. Type a genre or radio station in the search bar above to load new categories!",
-                                color = Color.LightGray,
-                                fontSize = 13.sp,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
-                    }
-                }
-
-                // Active Category Status Bar
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            // Left side: Clickable Category Name (with Marquee) & Subtitle (Category X of Y)
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable {
-                                        dropdownExpanded = false
-                                        categoriesListExpanded = !categoriesListExpanded
-                                        stationsListExpanded = false
-                                        focusManager.clearFocus()
-                                        keyboardController?.hide()
-                                    }
-                            ) {
-                                val categoryTitle = when {
-                                    state.isLoading && state.searchingCategoryName != null -> "Searching for '${state.searchingCategoryName}'..."
-                                    state.isLoading -> "Loading $currentCategoryName..."
-                                    else -> currentCategoryName
-                                }
-
-                                Text(
-                                    text = categoryTitle,
-                                    color = Color(0xFFD0BCFF),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
-                                )
-
-                                if (!state.isLoading) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Text(
-                                        text = "Category $currentCategoryNum of $totalCategories",
-                                        color = Color.Gray,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Normal,
-                                        maxLines = 1
+                                        text = "All Loaded Categories ($totalCategories)",
+                                        color = Color(0xFFD0BCFF),
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold
                                     )
+                                    IconButton(
+                                        onClick = { categoriesListExpanded = false },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Close Category List",
+                                            tint = Color.Gray,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
-                            }
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Text List icon to bring down all stations in current category
-                                IconButton(
-                                    onClick = {
-                                        stationsListExpanded = !stationsListExpanded
-                                        categoriesListExpanded = false
-                                    },
-                                    modifier = Modifier.size(28.dp)
+                                HorizontalDivider(color = Color(0xFF2E2E38), thickness = 1.dp)
+                                LazyColumn(
+                                    state = categoriesListState,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.FormatListBulleted,
-                                        contentDescription = "Stations List",
-                                        tint = if (stationsListExpanded) Color(0xFFD0BCFF) else Color.White
-                                    )
-                                }
+                                    itemsIndexed(loadedCategories, key = { _, category -> category.id }) { index, category ->
+                                        if (index !in loadedCategories.indices) return@itemsIndexed
+                                        val isSelected = index == state.categoryIndex
+                                        val isSkipped = state.skippedCategoryIds.contains(category.id)
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    viewModel.onCategorySelected(index)
+                                                    categoriesListExpanded = false
+                                                }
+                                                .background(if (isSelected) Color(0xFF383842) else Color.Transparent)
+                                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = "Category ${index + 1}. ${category.name} (${category.stations.size})",
+                                                color = if (isSelected) Color(0xFFD0BCFF) else Color.White,
+                                                fontSize = 14.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f)
+                                            )
 
-                                // Delete category button
-                                IconButton(
-                                    onClick = {
-                                        if (state.categoryIndex >= 0) {
-                                            showDeleteCategoryDialog = true
-                                        }
-                                    },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Delete Category",
-                                        tint = Color.White
-                                    )
-                                }
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                IconButton(
+                                                    onClick = {
+                                                        categoryToDeleteIndex = index
+                                                        showDeleteCategoryDialog = true
+                                                    },
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.DeleteOutline,
+                                                        contentDescription = "Delete Category",
+                                                        tint = Color(0xFFFF6B6B),
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
 
-                                // Category Skip Toggle Arrow (Green long arrow vs Red X overlay)
-                                val isCatSkipped = state.skippedCategoryIds.contains(state.currentCategory?.id)
-                                ArrowWithRedXIcon(
-                                    isContinuousNav = !isCatSkipped,
-                                    onClick = {
-                                        if (state.categoryIndex >= 0) {
-                                            viewModel.onToggleCategorySkipped(state.categoryIndex)
+                                                ArrowWithRedXIcon(
+                                                    isContinuousNav = !isSkipped,
+                                                    onClick = { viewModel.onToggleCategorySkipped(index) }
+                                                )
+                                            }
                                         }
                                     }
-                                )
+                                }
                             }
                         }
-                        if (state.isLoading) {
-                            LinearProgressIndicator(
-                                modifier = Modifier.fillMaxWidth(),
-                                color = Color(0xFFD0BCFF),
-                                trackColor = Color.Transparent
-                            )
-                        }
                     }
-                }
 
-                // Search Error / No Results Banner
-                if (state.searchError != null) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF4A1A1A))
-                    ) {
-                        Row(
+                    // Option 3: Stations in Category Modal List
+                    else if (stationsListExpanded && (state.currentCategory?.stations?.isNotEmpty() == true)) {
+                        val stationsListState = rememberLazyListState()
+                        LaunchedEffect(stationsListExpanded, state.stationIndex, state.currentCategory?.stations?.size) {
+                            try {
+                                val currentStations = state.currentCategory?.stations
+                                if (stationsListExpanded && currentStations != null && state.stationIndex in currentStations.indices) {
+                                    stationsListState.scrollToItem(state.stationIndex)
+                                }
+                            } catch (_: Exception) {}
+                        }
+
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                                .heightIn(max = 340.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            border = BorderStroke(1.5.dp, Color(0xFFD0BCFF)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF22222B))
                         ) {
-                            Text(
-                                text = state.searchError ?: "",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.weight(1f)
-                            )
-                            IconButton(
-                                onClick = { viewModel.onClearSearchError() },
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Dismiss",
-                                    tint = Color.LightGray,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Dropdown of ALL Categories when category title on left is clicked
-                if (categoriesListExpanded && loadedCategories.isNotEmpty()) {
-                    val categoriesListState = rememberLazyListState()
-                    LaunchedEffect(categoriesListExpanded, state.categoryIndex, loadedCategories.size) {
-                        try {
-                            if (categoriesListExpanded && state.categoryIndex in loadedCategories.indices) {
-                                categoriesListState.scrollToItem(state.categoryIndex)
-                            }
-                        } catch (_: Exception) {}
-                    }
-
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 240.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
-                    ) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "All Loaded Categories ($totalCategories)",
-                                    color = Color(0xFFD0BCFF),
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                IconButton(
-                                    onClick = { categoriesListExpanded = false },
-                                    modifier = Modifier.size(24.dp)
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Close Category List",
-                                        tint = Color.Gray,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            }
-                            HorizontalDivider(color = Color(0xFF2E2E38), thickness = 1.dp)
-                            LazyColumn(
-                                state = categoriesListState,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                itemsIndexed(loadedCategories, key = { _, category -> category.id }) { index, category ->
-                                    if (index !in loadedCategories.indices) return@itemsIndexed
-                                    val isSelected = index == state.categoryIndex
-                                    val isSkipped = state.skippedCategoryIds.contains(category.id)
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                viewModel.onCategorySelected(index)
-                                                categoriesListExpanded = false
-                                            }
-                                            .background(if (isSelected) Color(0xFF383842) else Color.Transparent)
-                                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = "Category ${index + 1}. ${category.name} (${category.stations.size})",
-                                            color = if (isSelected) Color(0xFFD0BCFF) else Color.White,
-                                            fontSize = 14.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f)
-                                        )
-
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            IconButton(
-                                                onClick = {
-                                                    categoryToDeleteIndex = index
-                                                    showDeleteCategoryDialog = true
-                                                },
-                                                modifier = Modifier.size(32.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.DeleteOutline,
-                                                    contentDescription = "Delete Category",
-                                                    tint = Color(0xFFFF6B6B),
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-
-                                            ArrowWithRedXIcon(
-                                                isContinuousNav = !isSkipped,
-                                                onClick = { viewModel.onToggleCategorySkipped(index) }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Dropdown of stations in folder/category when list icon is clicked
-                if (stationsListExpanded && (state.currentCategory?.stations?.isNotEmpty() == true)) {
-                    val stationsListState = rememberLazyListState()
-                    LaunchedEffect(stationsListExpanded, state.stationIndex, state.currentCategory?.stations?.size) {
-                        try {
-                            val currentStations = state.currentCategory?.stations
-                            if (stationsListExpanded && currentStations != null && state.stationIndex in currentStations.indices) {
-                                stationsListState.scrollToItem(state.stationIndex)
-                            }
-                        } catch (_: Exception) {}
-                    }
-
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 240.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
-                    ) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Stations in ${state.currentCategory?.name ?: "Category"}",
-                                    color = Color(0xFFD0BCFF),
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                IconButton(
-                                    onClick = { stationsListExpanded = false },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Close Station List",
-                                        tint = Color.Gray,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            }
-                            HorizontalDivider(color = Color(0xFF2E2E38), thickness = 1.dp)
-                            val currentCatStations = state.currentCategory?.stations ?: emptyList()
-                            LazyColumn(
-                                state = stationsListState,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                itemsIndexed(currentCatStations, key = { index, station -> "${station.id}_$index" }) { index, station ->
-                                    if (index !in currentCatStations.indices) return@itemsIndexed
-                                    val isSelected = index == state.stationIndex
-                                    val totalStationCount = currentCatStations.size
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                viewModel.onStationSelected(state.categoryIndex, index)
-                                                stationsListExpanded = false
-                                            }
-                                            .background(if (isSelected) Color(0xFF383842) else Color.Transparent)
-                                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = "${index + 1}. ${station.name}",
-                                            color = if (isSelected) Color(0xFFD0BCFF) else Color.White,
-                                            fontSize = 14.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f)
-                                        )
-
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                        ) {
-                                            if (isSelected && state.isPlaying) {
-                                                Text(
-                                                    text = "Playing",
-                                                    color = Color.Green,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(end = 4.dp)
-                                                )
-                                            }
-
-                                            IconButton(
-                                                onClick = { viewModel.onMoveStationUp(state.categoryIndex, index) },
-                                                enabled = index > 0,
-                                                modifier = Modifier.size(28.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.KeyboardArrowUp,
-                                                    contentDescription = "Move Up",
-                                                    tint = if (index > 0) Color.White else Color.DarkGray,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-
-                                            IconButton(
-                                                onClick = { viewModel.onMoveStationDown(state.categoryIndex, index) },
-                                                enabled = index < totalStationCount - 1,
-                                                modifier = Modifier.size(28.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.KeyboardArrowDown,
-                                                    contentDescription = "Move Down",
-                                                    tint = if (index < totalStationCount - 1) Color.White else Color.DarkGray,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-
-                                            val isStatSkipped = state.skippedStationIds.contains(station.id)
-                                            ArrowWithRedXIcon(
-                                                isContinuousNav = !isStatSkipped,
-                                                onClick = { viewModel.onToggleStationSkipped(station.id) }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Middle: Compact Now Playing Card (Docked snugly under Category Card)
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 2.dp)
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() }
-                    ) {
-                        dropdownExpanded = false
-                        categoriesListExpanded = false
-                        stationsListExpanded = false
-                        focusManager.clearFocus()
-                        keyboardController?.hide()
-                    },
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        // Station Name with (1 of 5) and Auto-Marquee
-                        val totalStations = state.currentCategory?.stations?.size ?: 0
-                        val currentStationNum = (state.stationIndex + 1).coerceAtLeast(1)
-                        val stationDisplayName = state.currentStation?.name ?: "Select a station"
-                        Text(
-                            text = "$stationDisplayName ($currentStationNum of $totalStations)",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
-                        )
-
-                        // Music / Song Title with Auto-Marquee
-                        val songTitle = state.trackTitle ?: stationDisplayName
-                        Text(
-                            text = "Title: $songTitle",
-                            color = Color(0xFFD0BCFF),
-                            fontSize = 13.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
-                        )
-
-                        // Musician / Singer / Artist with Auto-Marquee
-                        val artist = state.artistName ?: "Live Radio Stream"
-                        Text(
-                            text = "Artist: $artist",
-                            color = Color.LightGray,
-                            fontSize = 13.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    // Mini VU Meter & Custom Navigation Action Buttons
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        MiniVuMeter(isPlaying = state.isPlaying)
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Save Station to Category Button
-                            IconButton(
-                                onClick = { showSaveStationDialog = true },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.BookmarkAdd,
-                                    contentDescription = "Save Station to Category",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            // Delete Station / Trash Can Button
-                            IconButton(
-                                onClick = { showDeleteStationDialog = true },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.DeleteOutline,
-                                    contentDescription = "Delete Station",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            // Station Skip Arrow with Red X Icon
-                            val isCurrentStatSkipped = state.currentStation?.let { state.skippedStationIds.contains(it.id) } == true
-                            ArrowWithRedXIcon(
-                                isContinuousNav = !isCurrentStatSkipped,
-                                onClick = {
-                                    state.currentStation?.let { station ->
-                                        viewModel.onToggleStationSkipped(station.id)
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Inline Composer & History Summary Card (Auto-populated on Main Screen)
-            var autoTrackInfo by remember { mutableStateOf<TrackInfoResult?>(null) }
-            var autoFetching by remember { mutableStateOf(false) }
-
-            LaunchedEffect(state.currentStation, state.trackTitle, state.artistName) {
-                if (state.trackTitle != null || state.artistName != null || state.currentStation != null) {
-                    autoFetching = true
-                    autoTrackInfo = viewModel.fetchTrackDetailsOnline(
-                        artist = state.artistName,
-                        title = state.trackTitle,
-                        stationName = state.currentStation?.name
-                    )
-                    autoFetching = false
-                }
-            }
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 100.dp, max = 220.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = if (isLight) Color(0xFFFFFFFF) else Color(0xFF1B1B22))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    val searchQuery = autoTrackInfo?.query ?: "${state.artistName ?: ""} ${state.trackTitle ?: ""}".trim()
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Composer & Piece Information 📖",
-                            color = Color(0xFFD0BCFF),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Surface(
-                            onClick = {
-                                if (searchQuery.isNotBlank()) {
-                                    val url = "https://www.google.com/search?q=" + URLEncoder.encode(searchQuery, "UTF-8")
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                    context.startActivity(intent)
-                                }
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF383842),
-                            modifier = Modifier.height(24.dp)
-                        ) {
-                            Box(modifier = Modifier.padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
-                                Text("Search Google 🔍", color = Color(0xFFD0BCFF), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                            }
-                        }
-                    }
-
-                    // Interactive Google Search Chips for Composer, Piece, and Station
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val composer = autoTrackInfo?.composerQuery ?: state.artistName
-                        if (!composer.isNullOrBlank() && composer != "Live Radio Stream") {
-                            FilterChip(
-                                selected = false,
-                                onClick = {
-                                    val url = "https://www.google.com/search?q=" + URLEncoder.encode(composer, "UTF-8")
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                },
-                                label = { Text("🔍 Composer: $composer", fontSize = 11.sp, color = Color(0xFFD0BCFF)) },
-                                colors = FilterChipDefaults.filterChipColors(containerColor = Color(0xFF2E2E38))
-                            )
-                        }
-
-                        val piece = autoTrackInfo?.pieceQuery ?: state.trackTitle
-                        if (!piece.isNullOrBlank()) {
-                            FilterChip(
-                                selected = false,
-                                onClick = {
-                                    val url = "https://www.google.com/search?q=" + URLEncoder.encode(piece, "UTF-8")
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                },
-                                label = { Text("🎵 Piece: $piece", fontSize = 11.sp, color = Color(0xFFD0BCFF)) },
-                                colors = FilterChipDefaults.filterChipColors(containerColor = Color(0xFF2E2E38))
-                            )
-                        }
-
-                        val station = autoTrackInfo?.stationQuery ?: state.currentStation?.name
-                        if (!station.isNullOrBlank()) {
-                            FilterChip(
-                                selected = false,
-                                onClick = {
-                                    val url = "https://www.google.com/search?q=" + URLEncoder.encode("$station radio station", "UTF-8")
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                },
-                                label = { Text("📻 Station: $station", fontSize = 11.sp, color = Color(0xFFD0BCFF)) },
-                                colors = FilterChipDefaults.filterChipColors(containerColor = Color(0xFF2E2E38))
-                            )
-                        }
-                    }
-
-                    HorizontalDivider(color = Color(0xFF2B2B36), thickness = 1.dp)
-
-                    if (autoFetching) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            CircularProgressIndicator(color = Color(0xFFD0BCFF), modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Looking up composer info...", color = Color.Gray, fontSize = 12.sp)
-                        }
-                    } else {
-                        val info = autoTrackInfo
-                        if (info != null && info.description.isNotBlank()) {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                item {
                                     Text(
-                                        text = info.description,
-                                        color = if (isLight) Color(0xFF2C2C2E) else Color.LightGray,
-                                        fontSize = 12.sp,
-                                        lineHeight = 16.sp
+                                        text = "Stations in ${state.currentCategory?.name ?: "Category"}",
+                                        color = Color(0xFFD0BCFF),
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold
                                     )
+                                    IconButton(
+                                        onClick = { stationsListExpanded = false },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Close Station List",
+                                            tint = Color.Gray,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                                HorizontalDivider(color = Color(0xFF2E2E38), thickness = 1.dp)
+                                val currentCatStations = state.currentCategory?.stations ?: emptyList()
+                                LazyColumn(
+                                    state = stationsListState,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    itemsIndexed(currentCatStations, key = { index, station -> "${station.id}_$index" }) { index, station ->
+                                        if (index !in currentCatStations.indices) return@itemsIndexed
+                                        val isSelected = index == state.stationIndex
+                                        val totalStationCount = currentCatStations.size
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    viewModel.onStationSelected(state.categoryIndex, index)
+                                                    stationsListExpanded = false
+                                                }
+                                                .background(if (isSelected) Color(0xFF383842) else Color.Transparent)
+                                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = "${index + 1}. ${station.name}",
+                                                color = if (isSelected) Color(0xFFD0BCFF) else Color.White,
+                                                fontSize = 14.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f)
+                                            )
+
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                            ) {
+                                                if (isSelected && state.isPlaying) {
+                                                    Text(
+                                                        text = "Playing",
+                                                        color = Color.Green,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(end = 4.dp)
+                                                    )
+                                                }
+
+                                                IconButton(
+                                                    onClick = { viewModel.onMoveStationUp(state.categoryIndex, index) },
+                                                    enabled = index > 0,
+                                                    modifier = Modifier.size(28.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.KeyboardArrowUp,
+                                                        contentDescription = "Move Up",
+                                                        tint = if (index > 0) Color.White else Color.DarkGray,
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
+
+                                                IconButton(
+                                                    onClick = { viewModel.onMoveStationDown(state.categoryIndex, index) },
+                                                    enabled = index < totalStationCount - 1,
+                                                    modifier = Modifier.size(28.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.KeyboardArrowDown,
+                                                        contentDescription = "Move Down",
+                                                        tint = if (index < totalStationCount - 1) Color.White else Color.DarkGray,
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
+
+                                                val isStatSkipped = state.skippedStationIds.contains(station.id)
+                                                ArrowWithRedXIcon(
+                                                    isContinuousNav = !isStatSkipped,
+                                                    onClick = { viewModel.onToggleStationSkipped(station.id) }
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
-                        } else {
-                            Text(
-                                text = "No automatic summary found for '$searchQuery'. Tap Google Search chips above for recordings and composer details.",
-                                color = Color.Gray,
-                                fontSize = 12.sp
-                            )
                         }
                     }
                 }
-            }
-
-            // Bottom Section: Playback Control Deck moved up & Ad Banner Space at the bottom
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Playback Control Deck (5 buttons)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = { viewModel.onPreviousCategoryClicked() },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardDoubleArrowLeft,
-                            contentDescription = "Previous Category",
-                            tint = Color.White,
-                            modifier = Modifier.size(30.dp)
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { viewModel.onPreviousClicked() },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                            contentDescription = "Previous Station",
-                            tint = Color.White,
-                            modifier = Modifier.size(30.dp)
-                        )
-                    }
-
-                    val buttonColor = if (state.isPlaying) Color(0xFFD32F2F) else Color(0xFF388E3C)
-                    Button(
-                        onClick = { viewModel.onPlayPauseClicked() },
-                        shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
-                        modifier = Modifier.size(72.dp),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (state.isPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
-                            contentDescription = if (state.isPlaying) "Stop" else "Play",
-                            tint = Color.White,
-                            modifier = Modifier.size(34.dp)
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { viewModel.onNextClicked() },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = "Next Station",
-                            tint = Color.White,
-                            modifier = Modifier.size(30.dp)
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { viewModel.onNextCategoryClicked() },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardDoubleArrowRight,
-                            contentDescription = "Next Category",
-                            tint = Color.White,
-                            modifier = Modifier.size(30.dp)
-                        )
-                    }
-                }
-
-                // Ad Banner at the very bottom
-                com.coppersmith.music2.ads.AdBanner(
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
         }
     }
@@ -1564,9 +1591,9 @@ fun MainScreen(viewModel: MusicViewModel) {
             confirmButton = {
                 Button(
                     onClick = {
-                        val searchQuery = trackInfoResult?.query ?: "${state.artistName ?: ""} ${state.trackTitle ?: ""}".trim()
-                        if (searchQuery.isNotBlank()) {
-                            val url = "https://www.google.com/search?q=" + URLEncoder.encode(searchQuery, "UTF-8")
+                        val searchReq = trackInfoResult?.query ?: "${state.artistName ?: ""} ${state.trackTitle ?: ""}".trim()
+                        if (searchReq.isNotBlank()) {
+                            val url = "https://www.google.com/search?q=" + URLEncoder.encode(searchReq, "UTF-8")
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                             context.startActivity(intent)
                         }
