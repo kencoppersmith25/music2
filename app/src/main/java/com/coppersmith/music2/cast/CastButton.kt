@@ -47,28 +47,38 @@ fun GoogleCastIconButton(
             override fun onSessionStarting(session: CastSession) {}
             override fun onSessionStarted(session: CastSession, sessionId: String) {
                 isConnected = true
+                com.coppersmith.music2.data.repository.PlaybackRepository.onCastSessionConnected(session)
             }
             override fun onSessionStartFailed(session: CastSession, error: Int) {
                 isConnected = false
+                com.coppersmith.music2.data.repository.PlaybackRepository.onCastSessionDisconnected()
             }
             override fun onSessionEnding(session: CastSession) {}
             override fun onSessionEnded(session: CastSession, error: Int) {
                 isConnected = false
+                com.coppersmith.music2.data.repository.PlaybackRepository.onCastSessionDisconnected()
             }
             override fun onSessionResuming(session: CastSession, sessionId: String) {}
             override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
                 isConnected = true
+                com.coppersmith.music2.data.repository.PlaybackRepository.onCastSessionConnected(session)
             }
             override fun onSessionResumeFailed(session: CastSession, error: Int) {
                 isConnected = false
+                com.coppersmith.music2.data.repository.PlaybackRepository.onCastSessionDisconnected()
             }
             override fun onSessionSuspended(session: CastSession, reason: Int) {
                 isConnected = false
+                com.coppersmith.music2.data.repository.PlaybackRepository.onCastSessionDisconnected()
             }
         }
 
         castContext?.sessionManager?.addSessionManagerListener(listener, CastSession::class.java)
-        isConnected = castContext?.sessionManager?.currentCastSession?.isConnected == true
+        val currentSess = castContext?.sessionManager?.currentCastSession
+        if (currentSess?.isConnected == true) {
+            isConnected = true
+            com.coppersmith.music2.data.repository.PlaybackRepository.onCastSessionConnected(currentSess)
+        }
 
         onDispose {
             castContext?.sessionManager?.removeSessionManagerListener(listener, CastSession::class.java)

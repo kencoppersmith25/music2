@@ -666,6 +666,55 @@ object PlaybackRepository {
 
     private val categoryLastStationMap = mutableMapOf<Int, Int>()
 
+    private var activeCastSession: com.google.android.gms.cast.framework.CastSession? = null
+
+    fun onCastSessionConnected(session: com.google.android.gms.cast.framework.CastSession) {
+        activeCastSession = session
+        RideLogger.log("CAST_CONNECTED session='${session.sessionId}'")
+        val currentStat = _state.value.currentStation
+        if (currentStat != null) {
+            playOnCastSession(session, currentStat)
+        }
+    }
+
+    fun onCastSessionDisconnected() {
+        RideLogger.log("CAST_DISCONNECTED")
+        val wasCasting = (activeCastSession != null)
+        activeCastSession = null
+        if (wasCasting && _state.value.isPlaying) {
+            exoPlayer?.playWhenReady = true
+            exoPlayer?.prepare()
+            exoPlayer?.play()
+        }
+    }
+
+    private fun playOnCastSession(session: com.google.android.gms.cast.framework.CastSession, station: Station) {
+        val remoteMediaClient = session.remoteMediaClient ?: return
+        try {
+            exoPlayer?.pause()
+
+            val mediaMetadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK)
+            mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, station.name)
+            mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, "Live Radio Stream")
+
+            val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(station.streamUrl)
+                .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE)
+                .setContentType("audio/mpeg")
+                .setMetadata(mediaMetadata)
+                .build()
+
+            val request = com.google.android.gms.cast.MediaLoadRequestData.Builder()
+                .setMediaInfo(mediaInfo)
+                .setAutoplay(true)
+                .build()
+
+            remoteMediaClient.load(request)
+            RideLogger.log("CAST_PLAYING_REMOTE station='${station.name}' url='${station.streamUrl}'")
+        } catch (e: Exception) {
+            RideLogger.log("CAST_PLAY_ERROR error='${e.message}'")
+        }
+    }
+
     private fun commitState(categoryIndex: Int, stationIndex: Int? = null, autoPlay: Boolean = true) {
         if (playlist.isEmpty()) return
         val safeCatIdx = categoryIndex.coerceIn(0, playlist.size - 1)
@@ -691,7 +740,12 @@ object PlaybackRepository {
         savePlaybackSelectionToDisk(appContext, safeCatIdx, safeStatIdx)
 
         RideLogger.log("COMMIT_STATE catIdx=$safeCatIdx statIdx=$safeStatIdx category='${category.name}' station='${station.name}' autoPlay=$autoPlay")
-        if (autoPlay) {
+        val castSess = activeCastSession
+        if (castSess != null && castSess.isConnected) {
+            if (autoPlay) {
+                playOnCastSession(castSess, station)
+            }
+        } else if (autoPlay) {
             startStartupWatchdog(station)
         }
 
