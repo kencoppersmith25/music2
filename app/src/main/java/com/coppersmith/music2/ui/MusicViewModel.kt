@@ -40,15 +40,9 @@ class MusicViewModel : ViewModel() {
         }
     }
 
-    fun onMoveStationUp(categoryIndex: Int, stationIndex: Int) {
+    fun onReorderStation(categoryIndex: Int, fromIndex: Int, toIndex: Int) {
         viewModelScope.launch {
-            repository.moveStationUp(categoryIndex, stationIndex)
-        }
-    }
-
-    fun onMoveStationDown(categoryIndex: Int, stationIndex: Int) {
-        viewModelScope.launch {
-            repository.moveStationDown(categoryIndex, stationIndex)
+            repository.reorderStation(categoryIndex, fromIndex, toIndex)
         }
     }
 

@@ -14,7 +14,7 @@ android {
     defaultConfig {
         applicationId = "com.coppersmith.music1chat"
         minSdk = 26
-        targetSdk = 37
+        targetSdk = 35
         versionCode = 200
         versionName = "2.0.0"
 
@@ -62,8 +62,8 @@ dependencies {
     implementation("androidx.media3:media3-cast:1.3.1")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
     implementation("com.google.android.gms:play-services-ads:23.6.0")
-    implementation("com.google.android.gms:play-services-cast-framework:21.5.0")
-    implementation("androidx.mediarouter:mediarouter:1.7.0")
+    implementation("com.google.android.gms:play-services-cast-framework:22.0.0")
+    implementation("androidx.mediarouter:mediarouter:1.8.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

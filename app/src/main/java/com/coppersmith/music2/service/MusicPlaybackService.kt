@@ -37,6 +37,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.cast.CastPlayer
 import androidx.media3.cast.SessionAvailabilityListener
+import com.coppersmith.music2.cast.SafeMediaItemConverter
 import com.google.common.collect.ImmutableList
 import com.coppersmith.music2.data.repository.PlaybackRepository
 import com.coppersmith.music2.diagnostics.RideLogger
@@ -54,6 +55,7 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
 
     private var mediaSession: MediaSession? = null
     private var castPlayer: CastPlayer? = null
+    private var castManager: com.coppersmith.music2.cast.CastManager? = null
     private lateinit var player: ExoPlayer
     private val repository = PlaybackRepository
 
@@ -143,6 +145,7 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private var multicastLock: android.net.wifi.WifiManager.MulticastLock? = null
 
     private fun acquireWakeLock() {
         try {
@@ -175,6 +178,34 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         }
     }
 
+    private fun acquireMulticastLock() {
+        try {
+            if (multicastLock == null) {
+                val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+                multicastLock = wifiManager?.createMulticastLock("Music2:CastMulticast")?.apply {
+                    setReferenceCounted(false)
+                }
+            }
+            if (multicastLock?.isHeld == false) {
+                multicastLock?.acquire()
+                Log.d("MusicPlaybackService", "Acquired MulticastLock for Cast device discovery")
+            }
+        } catch (e: Exception) {
+            Log.e("MusicPlaybackService", "Error acquiring MulticastLock: ${e.message}")
+        }
+    }
+
+    private fun releaseMulticastLock() {
+        try {
+            if (multicastLock?.isHeld == true) {
+                multicastLock?.release()
+                Log.d("MusicPlaybackService", "Released MulticastLock")
+            }
+        } catch (e: Exception) {
+            Log.e("MusicPlaybackService", "Error releasing MulticastLock: ${e.message}")
+        }
+    }
+
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var pausedForPhoneCall = false
@@ -199,14 +230,16 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                     }
                 }
                 AudioManager.AUDIOFOCUS_GAIN -> {
-                    Log.d("MusicPlaybackService", "AudioFocus gained. Restoring volume to 100% and player.")
-                    RideLogger.log("AUDIO_FOCUS_GAINED: Phone call ended -> Restoring volume to 100% and resuming playback")
+                    Log.d("MusicPlaybackService", "AudioFocus gained. Restoring volume to 100% and re-preparing live stream.")
+                    RideLogger.log("AUDIO_FOCUS_GAINED: Phone call ended -> Restoring volume to 100% and re-preparing live stream")
                     player.volume = 1.0f
                     if (pausedForPhoneCall) {
                         pausedForPhoneCall = false
                         serviceScope.launch {
                             repository.setPlaying(true)
                         }
+                        player.seekToDefaultPosition()
+                        player.prepare()
                         player.play()
                     }
                 }
@@ -322,6 +355,7 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
     override fun onCreate() {
         super.onCreate()
 
+        acquireMulticastLock()
         createNotificationChannel()
 
         try {
@@ -341,62 +375,46 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
         // Initialize Text-To-Speech engine for category announcements
         textToSpeech = TextToSpeech(this, this)
 
-        // Initialize Google Cast Session Manager Listener in Service
-        try {
-            val castContext = com.google.android.gms.cast.framework.CastContext.getSharedInstance(this)
-            castPlayer = CastPlayer(castContext)
+        // Initialize Google Cast Session Manager & Player asynchronously on main thread
+        serviceScope.launch(Dispatchers.Main) {
+            try {
+                val castContext = com.google.android.gms.cast.framework.CastContext.getSharedInstance(applicationContext)
+                val cPlayer = CastPlayer(castContext, SafeMediaItemConverter())
+                castPlayer = cPlayer
+                repository.castPlayer = cPlayer
 
-            castPlayer?.setSessionAvailabilityListener(object : SessionAvailabilityListener {
-                override fun onCastSessionAvailable() {
-                    RideLogger.log("SERVICE_CAST_PLAYER_AVAILABLE")
-                    val sess = castContext.sessionManager.currentCastSession
-                    if (sess != null) {
-                        repository.onCastSessionConnected(sess)
+                cPlayer.setSessionAvailabilityListener(object : SessionAvailabilityListener {
+                    override fun onCastSessionAvailable() {
+                        RideLogger.log("SERVICE_CAST_PLAYER_AVAILABLE")
+                        mediaSession?.player = cPlayer
+                        val sess = castContext.sessionManager.currentCastSession
+                        if (sess != null) {
+                            repository.onCastSessionConnected(sess)
+                        }
+                    }
+
+                    override fun onCastSessionUnavailable() {
+                        RideLogger.log("SERVICE_CAST_PLAYER_UNAVAILABLE")
+                        mediaSession?.player = player
+                        repository.onCastSessionDisconnected()
+                    }
+                })
+
+                castManager = com.coppersmith.music2.cast.CastManager(applicationContext) { session, isConnected ->
+                    if (isConnected && session != null) {
+                        RideLogger.log("SERVICE_CAST_STARTED session='${session.sessionId}'")
+                        mediaSession?.player = cPlayer
+                        repository.onCastSessionConnected(session)
+                    } else {
+                        RideLogger.log("SERVICE_CAST_DISCONNECTED")
+                        mediaSession?.player = player
+                        repository.onCastSessionDisconnected()
                     }
                 }
-
-                override fun onCastSessionUnavailable() {
-                    RideLogger.log("SERVICE_CAST_PLAYER_UNAVAILABLE")
-                    repository.onCastSessionDisconnected()
-                }
-            })
-
-            castContext.sessionManager.addSessionManagerListener(
-                object : com.google.android.gms.cast.framework.SessionManagerListener<com.google.android.gms.cast.framework.CastSession> {
-                    override fun onSessionStarting(s: com.google.android.gms.cast.framework.CastSession) {}
-                    override fun onSessionStarted(s: com.google.android.gms.cast.framework.CastSession, id: String) {
-                        RideLogger.log("SERVICE_CAST_STARTED session='$id'")
-                        repository.onCastSessionConnected(s)
-                    }
-                    override fun onSessionStartFailed(s: com.google.android.gms.cast.framework.CastSession, e: Int) {
-                        repository.onCastSessionDisconnected()
-                    }
-                    override fun onSessionEnding(s: com.google.android.gms.cast.framework.CastSession) {}
-                    override fun onSessionEnded(s: com.google.android.gms.cast.framework.CastSession, e: Int) {
-                        RideLogger.log("SERVICE_CAST_ENDED")
-                        repository.onCastSessionDisconnected()
-                    }
-                    override fun onSessionResuming(s: com.google.android.gms.cast.framework.CastSession, id: String) {}
-                    override fun onSessionResumed(s: com.google.android.gms.cast.framework.CastSession, wasSuspended: Boolean) {
-                        RideLogger.log("SERVICE_CAST_RESUMED")
-                        repository.onCastSessionConnected(s)
-                    }
-                    override fun onSessionResumeFailed(s: com.google.android.gms.cast.framework.CastSession, e: Int) {
-                        repository.onCastSessionDisconnected()
-                    }
-                    override fun onSessionSuspended(s: com.google.android.gms.cast.framework.CastSession, e: Int) {
-                        repository.onCastSessionDisconnected()
-                    }
-                },
-                com.google.android.gms.cast.framework.CastSession::class.java
-            )
-
-            val currentSess = castContext.sessionManager.currentCastSession
-            if (currentSess?.isConnected == true) {
-                repository.onCastSessionConnected(currentSess)
+                castManager?.register()
+            } catch (e: Exception) {
+                Log.e("MusicPlaybackService", "Cast setup error: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.e("MusicPlaybackService", "CastContext listener setup error: ${e.message}")
         }
 
         // 1. Configure HTTP Data Source with Cross-Protocol Redirects for Live Radio Streams
@@ -509,9 +527,11 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 Log.d("MusicPlaybackService", "onIsPlayingChanged: $isPlaying, playWhenReady: ${player.playWhenReady}, state: ${player.playbackState}")
                 RideLogger.log("IS_PLAYING_CHANGED isPlaying=$isPlaying station='${repository.state.value.currentStation?.name}'")
-                if (isPlaying || !player.playWhenReady) {
-                    serviceScope.launch {
-                        repository.setPlaying(isPlaying)
+                if (!repository.state.value.isCasting) {
+                    if (isPlaying || !player.playWhenReady) {
+                        serviceScope.launch {
+                            repository.setPlaying(isPlaying)
+                        }
                     }
                 }
             }
@@ -685,7 +705,10 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
     }
 
     override fun onDestroy() {
+        castManager?.unregister()
+        castManager = null
         releaseWakeLock()
+        releaseMulticastLock()
         repository.exoPlayer = null
         textToSpeech?.run {
             stop()

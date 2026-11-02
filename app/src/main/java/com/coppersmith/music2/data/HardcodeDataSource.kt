@@ -7,7 +7,7 @@ object HardcodedDataSource {
 
     // Full predefined category list with countries, sorted alphabetically
     val predefinedCategories = listOf(
-        "60s", "70s", "80s", "90s",
+        "50s & 60s", "70s", "80s", "90s",
         "African",
         "Alternative", "Ambient", "Americana",
         "Australia",
@@ -17,8 +17,8 @@ object HardcodedDataSource {
         "Classical", "College", "Comedy", "Country", "Dance", "Disco",
         "Electronic", "Folk", "France", "Funk",
         "Germany",
-        "Gospel", "Hawaiian", "Hip Hop", "House", "Indie",
-        "Ireland",
+        "Gospel", "Grime", "Hawaiian", "Hip Hop", "House", "Indie",
+        "Ireland", "Israeli",
         "Japan",
         "Jazz", "K-Pop", "Latin", "Lounge", "Metal",
         "News", "Oldies", "Opera", "Piano", "Pop", "Public", "Punk",

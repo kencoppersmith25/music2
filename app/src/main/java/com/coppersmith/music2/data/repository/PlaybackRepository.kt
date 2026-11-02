@@ -44,6 +44,7 @@ object PlaybackRepository {
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state.asStateFlow()
     var exoPlayer: ExoPlayer? = null
+    var castPlayer: CastPlayer? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val playlist = mutableListOf<Category>()
 
@@ -97,11 +98,18 @@ object PlaybackRepository {
             val prefs = ctx.getSharedPreferences("music2_user_data", Context.MODE_PRIVATE)
             val skippedCatsJson = JSONArray(_state.value.skippedCategoryIds).toString()
             val skippedStatsJson = JSONArray(_state.value.skippedStationIds).toString()
+
+            val lastStationsJson = org.json.JSONObject()
+            for ((catId, sIdx) in categoryLastStationMap) {
+                lastStationsJson.put(catId, sIdx)
+            }
+
             prefs.edit()
                 .putInt("saved_category_index", catIdx)
                 .putInt("saved_station_index", statIdx)
                 .putString("saved_skipped_cats", skippedCatsJson)
                 .putString("saved_skipped_stats", skippedStatsJson)
+                .putString("saved_category_last_stations", lastStationsJson.toString())
                 .apply()
         } catch (e: Exception) {
             e.printStackTrace()
@@ -114,6 +122,20 @@ object PlaybackRepository {
             val catIdx = prefs.getInt("saved_category_index", 0)
             val statIdx = prefs.getInt("saved_station_index", 0)
             val themeMode = prefs.getString("saved_theme_mode", "AUTO") ?: "AUTO"
+
+            val lastStationsJsonStr = prefs.getString("saved_category_last_stations", null)
+            if (!lastStationsJsonStr.isNullOrBlank()) {
+                try {
+                    val jsonObj = org.json.JSONObject(lastStationsJsonStr)
+                    val keys = jsonObj.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        categoryLastStationMap[key] = jsonObj.getInt(key)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
 
             val skippedCatsSet = mutableSetOf<String>()
             val skippedCatsJson = prefs.getString("saved_skipped_cats", null)
@@ -264,7 +286,9 @@ object PlaybackRepository {
         if (playing) {
             cancelStartupWatchdog()
         }
-        _state.update { it.copy(isPlaying = playing) }
+        if (!_state.value.isCasting) {
+            _state.update { it.copy(isPlaying = playing) }
+        }
     }
 
     private fun cancelStartupWatchdog() {
@@ -339,50 +363,6 @@ object PlaybackRepository {
         _state.update { it.copy(skippedCategoryIds = currentSet) }
         savePlaybackSelectionToDisk(appContext, _state.value.categoryIndex, _state.value.stationIndex)
         savePlaylistToDisk(appContext)
-    }
-
-    private fun commitState(categoryIndex: Int, stationIndex: Int) {
-        if (playlist.isEmpty()) return
-        val safeCatIdx = categoryIndex.coerceIn(0, playlist.size - 1)
-        val category = playlist[safeCatIdx]
-        if (category.stations.isEmpty()) return
-        val safeStatIdx = stationIndex.coerceIn(0, category.stations.size - 1)
-        val station = category.stations[safeStatIdx]
-
-        _state.update {
-            it.copy(
-                categoryIndex = safeCatIdx,
-                stationIndex = safeStatIdx,
-                currentCategory = category,
-                currentStation = station,
-                isPlaying = true
-            )
-        }
-
-        savePlaybackSelectionToDisk(appContext, safeCatIdx, safeStatIdx)
-        RideLogger.log("COMMIT_STATE catIdx=$safeCatIdx statIdx=$safeStatIdx category='${category.name}' station='${station.name}'")
-
-        scope.launch(Dispatchers.Main) {
-            exoPlayer?.let { player ->
-                val metadata = MediaMetadata.Builder()
-                    .setTitle(station.name)
-                    .setArtist(_state.value.artistName ?: "Live Radio Stream")
-                    .setAlbumTitle(category.name)
-                    .setDisplayTitle(station.name)
-                    .setSubtitle(_state.value.artistName ?: "Live Radio Stream")
-                    .build()
-
-                val mediaItem = MediaItem.Builder()
-                    .setUri(station.streamUrl)
-                    .setMediaMetadata(metadata)
-                    .build()
-
-                player.setMediaItem(mediaItem)
-                player.prepare()
-                player.play()
-            }
-        }
-        startStartupWatchdog(station)
     }
 
     suspend fun togglePlayPause() = mutex.withLock {
@@ -691,13 +671,13 @@ object PlaybackRepository {
         }
     }
 
-    private val categoryLastStationMap = mutableMapOf<Int, Int>()
+    private val categoryLastStationMap = mutableMapOf<String, Int>()
 
     private var activeCastSession: com.google.android.gms.cast.framework.CastSession? = null
 
     fun onCastSessionConnected(session: com.google.android.gms.cast.framework.CastSession) {
         activeCastSession = session
-        _state.update { it.copy(isCasting = true) }
+        _state.update { it.copy(isCasting = true, isPlaying = true) }
         RideLogger.log("CAST_CONNECTED session='${session.sessionId}'")
         val currentStat = _state.value.currentStation
         if (currentStat != null) {
@@ -743,6 +723,34 @@ object PlaybackRepository {
 
     private fun playOnCastSession(session: com.google.android.gms.cast.framework.CastSession, station: Station) {
         scope.launch(Dispatchers.Main) {
+            val cPlayer = castPlayer
+            if (cPlayer != null && cPlayer.isCastSessionAvailable) {
+                try {
+                    exoPlayer?.pause()
+                    val mimeType = inferMimeTypeFast(station.streamUrl)
+                    val mediaItem = MediaItem.Builder()
+                        .setMediaId(station.id)
+                        .setUri(station.streamUrl)
+                        .setMimeType(mimeType)
+                        .setMediaMetadata(
+                            MediaMetadata.Builder()
+                                .setTitle(station.name)
+                                .setArtist(_state.value.currentCategory?.name ?: "Live Radio Stream")
+                                .build()
+                        )
+                        .build()
+
+                    cPlayer.setMediaItem(mediaItem)
+                    cPlayer.prepare()
+                    cPlayer.play()
+                    _state.update { it.copy(isPlaying = true) }
+                    RideLogger.log("CAST_PLAYER_PLAYING station='${station.name}' url='${station.streamUrl}'")
+                    return@launch
+                } catch (e: Exception) {
+                    RideLogger.log("CAST_PLAYER_ERROR error='${e.message}'")
+                }
+            }
+
             val remoteMediaClient = session.remoteMediaClient ?: return@launch
             try {
                 exoPlayer?.pause()
@@ -754,25 +762,27 @@ object PlaybackRepository {
                 castMeta.putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, _state.value.currentCategory?.name ?: "Live Radio Stream")
 
                 val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(station.streamUrl)
-                    .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_BUFFERED)
+                    .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE)
                     .setContentType(mimeType)
+                    .setContentUrl(station.streamUrl)
                     .setMetadata(castMeta)
                     .build()
 
                 val request = com.google.android.gms.cast.MediaLoadRequestData.Builder()
                     .setMediaInfo(mediaInfo)
                     .setAutoplay(true)
-                    .setCurrentTime(0)
                     .build()
 
                 val pendingResult = remoteMediaClient.load(request)
                 pendingResult.setResultCallback { result ->
                     if (result.status.isSuccess) {
+                        _state.update { it.copy(isPlaying = true) }
                         RideLogger.log("CAST_LOAD_SUCCESS station='${station.name}' url='${station.streamUrl}'")
                     } else {
                         RideLogger.log("CAST_LOAD_FAILED code=${result.status.statusCode} msg='${result.status.statusMessage}'")
                     }
                 }
+                _state.update { it.copy(isPlaying = true) }
                 RideLogger.log("CAST_PLAYING_REMOTE station='${station.name}' url='${station.streamUrl}'")
             } catch (e: Exception) {
                 RideLogger.log("CAST_PLAY_ERROR error='${e.message}'")
@@ -786,20 +796,20 @@ object PlaybackRepository {
         val category = playlist[safeCatIdx]
         if (category.stations.isEmpty()) return
 
-        // Save the current station index before leaving the current category
-        val currentCatIdx = _state.value.categoryIndex
-        if (currentCatIdx in playlist.indices) {
-            categoryLastStationMap[currentCatIdx] = _state.value.stationIndex
+        // Save current station index for current category before switching
+        val currentCat = _state.value.currentCategory
+        if (currentCat != null) {
+            categoryLastStationMap[currentCat.id] = _state.value.stationIndex
         }
 
-        // If a stationIndex is provided, use it. Otherwise recall from memory or default to 0.
+        // If a stationIndex is provided, use it. Otherwise recall from memory/disk or default to 0.
         val safeStatIdx = if (stationIndex != null) {
             stationIndex.coerceIn(0, category.stations.size - 1)
         } else {
-            categoryLastStationMap[safeCatIdx]?.coerceIn(0, category.stations.size - 1) ?: 0
+            categoryLastStationMap[category.id]?.coerceIn(0, category.stations.size - 1) ?: 0
         }
 
-        categoryLastStationMap[safeCatIdx] = safeStatIdx
+        categoryLastStationMap[category.id] = safeStatIdx
         val station = category.stations[safeStatIdx]
 
         savePlaybackSelectionToDisk(appContext, safeCatIdx, safeStatIdx)
@@ -812,6 +822,24 @@ object PlaybackRepository {
                     playOnCastSession(castSess, station)
                 }
             } else if (autoPlay) {
+                exoPlayer?.let { player ->
+                    val metadata = MediaMetadata.Builder()
+                        .setTitle(station.name)
+                        .setArtist(_state.value.artistName ?: "Live Radio Stream")
+                        .setAlbumTitle(category.name)
+                        .setDisplayTitle(station.name)
+                        .setSubtitle(_state.value.artistName ?: "Live Radio Stream")
+                        .build()
+
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(station.streamUrl)
+                        .setMediaMetadata(metadata)
+                        .build()
+
+                    player.setMediaItem(mediaItem)
+                    player.prepare()
+                    player.play()
+                }
                 startStartupWatchdog(station)
             }
         }
@@ -831,8 +859,8 @@ object PlaybackRepository {
 
     suspend fun deleteCategory(categoryIndex: Int) = mutex.withLock {
         if (playlist.isEmpty() || categoryIndex !in playlist.indices) return@withLock
-        playlist.removeAt(categoryIndex)
-        categoryLastStationMap.remove(categoryIndex)
+        val deletedCat = playlist.removeAt(categoryIndex)
+        categoryLastStationMap.remove(deletedCat.id)
         savePlaylistToDisk()
 
         if (playlist.isNotEmpty()) {
@@ -862,8 +890,8 @@ object PlaybackRepository {
             commitState(catIdx, nextStatIdx)
         } else {
             // Category has 0 stations left -> AUTOMATICALLY DELETE THE CATEGORY!
-            playlist.removeAt(catIdx)
-            categoryLastStationMap.remove(catIdx)
+            val deletedCat = playlist.removeAt(catIdx)
+            categoryLastStationMap.remove(deletedCat.id)
             savePlaylistToDisk()
             if (playlist.isNotEmpty()) {
                 val nextCatIdx = catIdx.coerceIn(0, playlist.size - 1)
@@ -940,6 +968,33 @@ object PlaybackRepository {
 
     suspend fun selectStation(categoryIndex: Int, stationIndex: Int) = mutex.withLock {
         commitState(categoryIndex, stationIndex)
+    }
+
+    suspend fun reorderStation(categoryIndex: Int, fromIndex: Int, toIndex: Int) = mutex.withLock {
+        val category = playlist.getOrNull(categoryIndex) ?: return@withLock
+        if (fromIndex !in category.stations.indices || toIndex !in category.stations.indices) return@withLock
+        if (fromIndex == toIndex) return@withLock
+
+        val mutableStations = category.stations.toMutableList()
+        val movedStation = mutableStations.removeAt(fromIndex)
+        mutableStations.add(toIndex, movedStation)
+
+        playlist[categoryIndex] = category.copy(stations = mutableStations)
+        savePlaylistToDisk()
+
+        val currentCatIdx = _state.value.categoryIndex
+        val currentStatIdx = _state.value.stationIndex
+        if (currentCatIdx == categoryIndex) {
+            val newStatIdx = when {
+                currentStatIdx == fromIndex -> toIndex
+                fromIndex < toIndex && currentStatIdx in (fromIndex + 1)..toIndex -> currentStatIdx - 1
+                fromIndex > toIndex && currentStatIdx in toIndex..<fromIndex -> currentStatIdx + 1
+                else -> currentStatIdx
+            }
+            commitState(categoryIndex, newStatIdx)
+        } else {
+            _state.update { it.copy(currentCategory = playlist[categoryIndex]) }
+        }
     }
 
     suspend fun moveStationUp(categoryIndex: Int, stationIndex: Int) = mutex.withLock {

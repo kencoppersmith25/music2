@@ -11,9 +11,17 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
@@ -100,6 +108,12 @@ fun MainScreen(viewModel: MusicViewModel) {
     var categoryToDeleteIndex by remember { mutableStateOf(-1) }
     var showSaveStationDialog by remember { mutableStateOf(false) }
 
+    var draggedStationId by remember { mutableStateOf<String?>(null) }
+    var originalDragIndex by remember { mutableIntStateOf(-1) }
+    var placeholderDragIndex by remember { mutableIntStateOf(-1) }
+    var currentTouchY by remember { mutableFloatStateOf(0f) }
+    var originalItemStartY by remember { mutableFloatStateOf(0f) }
+
     val state by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
 
@@ -141,7 +155,12 @@ fun MainScreen(viewModel: MusicViewModel) {
             searchQuery = ""
             focusManager.clearFocus()
             keyboardController?.hide()
-            viewModel.onCategorySelected("cat_${trimmed.lowercase()}", trimmed, trimmed)
+            com.coppersmith.music2.ads.AdManager.maybeShowInterstitial(
+                context as? Activity,
+                com.coppersmith.music2.ads.AdReason.SEARCH_SUBMIT
+            ) {
+                viewModel.onCategorySelected("cat_${trimmed.lowercase()}", trimmed, trimmed)
+            }
         }
     }
 
@@ -180,20 +199,20 @@ fun MainScreen(viewModel: MusicViewModel) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
+                    .padding(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 6.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Top Section: Branding, Utility Icons, Search & Category Status
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Top Row: App identity & utility icons (Boosted 50% in size)
+                    // Top Row: App identity & utility icons
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 18.dp, bottom = 10.dp),
+                            .padding(top = 10.dp, bottom = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -201,7 +220,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             shape = RoundedCornerShape(20.dp),
                             border = null,
                             colors = CardDefaults.cardColors(containerColor = bgColor),
-                            modifier = Modifier.size(80.dp)
+                            modifier = Modifier.size(64.dp)
                         ) {
                             Box(
                                 modifier = Modifier.fillMaxSize(),
@@ -270,8 +289,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(50.dp)
-                                    .padding(horizontal = 16.dp),
+                                    .height(46.dp)
+                                    .padding(horizontal = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -376,7 +395,7 @@ fun MainScreen(viewModel: MusicViewModel) {
 
                     // 2-Row Horizontally Scrollable Category Chips
                     val row1Chips = listOf(
-                        "Classical", "Jazz", "Blues", "60s", "70s", "80s", "90s",
+                        "Classical", "Jazz", "Blues", "50s & 60s", "70s", "80s", "90s",
                         "Rock", "Pop", "Country", "Soul", "Folk", "Gospel", "Big Band"
                     )
                     val row2Chips = listOf(
@@ -391,48 +410,48 @@ fun MainScreen(viewModel: MusicViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             row1Chips.forEach { chipName ->
                                 val isSelected = state.currentCategory?.name?.equals(chipName, ignoreCase = true) == true
                                 Surface(
                                     onClick = { onPerformCategorySearch(chipName) },
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = RoundedCornerShape(14.dp),
                                     color = if (isSelected) chipBgSelected else chipBgUnselected,
-                                    modifier = Modifier.height(32.dp)
+                                    modifier = Modifier.height(28.dp)
                                 ) {
                                     Box(
-                                        modifier = Modifier.padding(horizontal = 14.dp),
+                                        modifier = Modifier.padding(horizontal = 12.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             text = chipName,
                                             color = if (isSelected) Color.White else primaryTextColor,
-                                            fontSize = 13.sp
+                                            fontSize = 12.sp
                                         )
                                     }
                                 }
                             }
                         }
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             row2Chips.forEach { chipName ->
                                 val isSelected = state.currentCategory?.name?.equals(chipName, ignoreCase = true) == true
                                 Surface(
                                     onClick = { onPerformCategorySearch(chipName) },
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = RoundedCornerShape(14.dp),
                                     color = if (isSelected) chipBgSelected else chipBgUnselected,
-                                    modifier = Modifier.height(32.dp)
+                                    modifier = Modifier.height(28.dp)
                                 ) {
                                     Box(
-                                        modifier = Modifier.padding(horizontal = 14.dp),
+                                        modifier = Modifier.padding(horizontal = 12.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             text = chipName,
                                             color = if (isSelected) Color.White else primaryTextColor,
-                                            fontSize = 13.sp
+                                            fontSize = 12.sp
                                         )
                                     }
                                 }
@@ -484,7 +503,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -644,7 +663,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -759,7 +778,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 100.dp, max = 220.dp),
+                        .heightIn(min = 70.dp, max = 150.dp),
                     shape = RoundedCornerShape(16.dp),
                     border = cardBorder,
                     colors = CardDefaults.cardColors(containerColor = cardBgColor)
@@ -767,8 +786,8 @@ fun MainScreen(viewModel: MusicViewModel) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         val searchReq = autoTrackInfo?.query ?: "${state.artistName ?: ""} ${state.trackTitle ?: ""}".trim()
 
@@ -892,7 +911,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                 // Bottom Section: Playback Control Deck & Ad Banner
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Playback Control Deck (5 buttons)
@@ -902,7 +921,14 @@ fun MainScreen(viewModel: MusicViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
-                            onClick = { viewModel.onPreviousCategoryClicked() },
+                            onClick = {
+                                com.coppersmith.music2.ads.AdManager.maybeShowInterstitial(
+                                    context as? Activity,
+                                    com.coppersmith.music2.ads.AdReason.CATEGORY_CHANGE
+                                ) {
+                                    viewModel.onPreviousCategoryClicked()
+                                }
+                            },
                             modifier = Modifier.size(44.dp)
                         ) {
                             Icon(
@@ -954,7 +980,14 @@ fun MainScreen(viewModel: MusicViewModel) {
                         }
 
                         IconButton(
-                            onClick = { viewModel.onNextCategoryClicked() },
+                            onClick = {
+                                com.coppersmith.music2.ads.AdManager.maybeShowInterstitial(
+                                    context as? Activity,
+                                    com.coppersmith.music2.ads.AdReason.CATEGORY_CHANGE
+                                ) {
+                                    viewModel.onNextCategoryClicked()
+                                }
+                            },
                             modifier = Modifier.size(44.dp)
                         ) {
                             Icon(
@@ -997,7 +1030,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
-                        .padding(top = 110.dp)
+                        .padding(top = 80.dp)
                         .align(Alignment.TopCenter)
                 ) {
                     // Option 1: Search Category Dropdown List
@@ -1130,7 +1163,6 @@ fun MainScreen(viewModel: MusicViewModel) {
                                                 .fillMaxWidth()
                                                 .clickable {
                                                     viewModel.onCategorySelected(index)
-                                                    categoriesListExpanded = false
                                                 }
                                                 .background(itemBgColor)
                                                 .padding(horizontal = 14.dp, vertical = 8.dp),
@@ -1202,16 +1234,23 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = "Stations in ${state.currentCategory?.name ?: "Category"}",
-                                        color = purpleAccentColor,
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Column {
+                                        Text(
+                                            text = "Stations in ${state.currentCategory?.name ?: "Category"}",
+                                            color = purpleAccentColor,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "Press and hold, then drag to reorder.",
+                                            color = subTextColor,
+                                            fontSize = 11.sp
+                                        )
+                                    }
                                     IconButton(
                                         onClick = { stationsListExpanded = false },
                                         modifier = Modifier.size(28.dp)
@@ -1226,83 +1265,197 @@ fun MainScreen(viewModel: MusicViewModel) {
                                 }
                                 HorizontalDivider(color = dividerColor, thickness = 1.dp)
                                 val currentCatStations = state.currentCategory?.stations ?: emptyList()
-                                LazyColumn(
-                                    state = stationsListState,
+
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                ) {
-                                    itemsIndexed(currentCatStations, key = { index, station -> "${station.id}_$index" }) { index, station ->
-                                        if (index !in currentCatStations.indices) return@itemsIndexed
-                                        val isSelected = index == state.stationIndex
-                                        val totalStationCount = currentCatStations.size
-                                        val itemBgColor = if (isSelected) (if (isLight) Color(0xFFE5E5EA) else Color(0xFF383842)) else Color.Transparent
+                                        .weight(1f)
+                                        .pointerInput(currentCatStations, state.categoryIndex) {
+                                            detectDragGesturesAfterLongPress(
+                                                onDragStart = { offset ->
+                                                    val visibleItems = stationsListState.layoutInfo.visibleItemsInfo
+                                                    val targetItem = visibleItems.firstOrNull { item ->
+                                                        offset.y >= item.offset && offset.y <= item.offset + item.size
+                                                    }
+                                                    if (targetItem != null && targetItem.index in currentCatStations.indices) {
+                                                        originalDragIndex = targetItem.index
+                                                        placeholderDragIndex = targetItem.index
+                                                        draggedStationId = currentCatStations[targetItem.index].id
+                                                        originalItemStartY = targetItem.offset.toFloat()
+                                                        currentTouchY = offset.y
+                                                    }
+                                                },
+                                                onDragCancel = {
+                                                    draggedStationId = null
+                                                    originalDragIndex = -1
+                                                    placeholderDragIndex = -1
+                                                },
+                                                onDragEnd = {
+                                                    val from = originalDragIndex
+                                                    val to = placeholderDragIndex
+                                                    if (from != -1 && to != -1 && from != to) {
+                                                        viewModel.onReorderStation(state.categoryIndex, from, to)
+                                                    }
+                                                    draggedStationId = null
+                                                    originalDragIndex = -1
+                                                    placeholderDragIndex = -1
+                                                },
+                                                onDrag = { change, dragAmount ->
+                                                    if (draggedStationId != null) {
+                                                        change.consume()
+                                                        val layoutInfo = stationsListState.layoutInfo
+                                                        val viewportStart = layoutInfo.viewportStartOffset.toFloat()
+                                                        val viewportEnd = layoutInfo.viewportEndOffset.toFloat()
 
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    viewModel.onStationSelected(state.categoryIndex, index)
+                                                        currentTouchY = (currentTouchY + dragAmount.y).coerceIn(viewportStart + 10f, viewportEnd - 10f)
+
+                                                        // Auto-scroll list when finger is near top or bottom boundary
+                                                        val edgeZone = 70f
+                                                        val scrollDelta = when {
+                                                            currentTouchY < viewportStart + edgeZone -> -20f
+                                                            currentTouchY > viewportEnd - edgeZone -> 20f
+                                                            else -> 0f
+                                                        }
+                                                        if (scrollDelta != 0f) {
+                                                            stationsListState.dispatchRawDelta(scrollDelta)
+                                                        }
+
+                                                        val refreshedLayout = stationsListState.layoutInfo
+                                                        val visibleItems = refreshedLayout.visibleItemsInfo
+                                                        val targetItem = visibleItems.firstOrNull { item ->
+                                                            currentTouchY >= item.offset && currentTouchY <= item.offset + item.size
+                                                        } ?: visibleItems.minByOrNull { item ->
+                                                            kotlin.math.abs(currentTouchY - (item.offset + item.size / 2f))
+                                                        }
+
+                                                        if (targetItem != null && targetItem.index in currentCatStations.indices) {
+                                                            placeholderDragIndex = targetItem.index
+                                                        }
+                                                    }
                                                 }
-                                                .background(itemBgColor)
-                                                .padding(horizontal = 14.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                text = "${index + 1}. ${station.name}",
-                                                color = if (isSelected) purpleAccentColor else primaryTextColor,
-                                                fontSize = 14.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.weight(1f)
                                             )
+                                        }
+                                ) {
+                                    LazyColumn(
+                                        state = stationsListState,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp)
+                                    ) {
+                                        itemsIndexed(currentCatStations, key = { index, station -> "${station.id}_$index" }) { index, station ->
+                                            if (index !in currentCatStations.indices) return@itemsIndexed
+                                            val isSelected = index == state.stationIndex
+                                            val itemBgColor = if (isSelected) (if (isLight) Color(0xFFE5E5EA) else Color(0xFF383842)) else Color.Transparent
+
+                                            val isDragged = draggedStationId == station.id
+                                            val showInsertionBefore = draggedStationId != null && placeholderDragIndex <= originalDragIndex && index == placeholderDragIndex
+                                            val showInsertionAfter = draggedStationId != null && placeholderDragIndex > originalDragIndex && index == placeholderDragIndex
+
+                                            // Hide/dim item inside LazyColumn while dragged so the top-level Floating Overlay Card represents it
+                                            val rowAlpha = if (isDragged) 0.15f else 1.0f
 
                                             Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .alpha(rowAlpha)
+                                                    .clickable {
+                                                        viewModel.onStationSelected(state.categoryIndex, index)
+                                                    }
+                                                    .background(itemBgColor)
+                                                    .drawWithContent {
+                                                        drawContent()
+                                                        val strokeWidth = 4.dp.toPx()
+                                                        val horizontalInset = 10.dp.toPx()
+                                                        if (showInsertionBefore) {
+                                                            drawLine(
+                                                                color = purpleAccentColor,
+                                                                start = Offset(horizontalInset, strokeWidth / 2f),
+                                                                end = Offset(size.width - horizontalInset, strokeWidth / 2f),
+                                                                strokeWidth = strokeWidth
+                                                            )
+                                                        }
+                                                        if (showInsertionAfter) {
+                                                            drawLine(
+                                                                color = purpleAccentColor,
+                                                                start = Offset(horizontalInset, size.height - strokeWidth / 2f),
+                                                                end = Offset(size.width - horizontalInset, size.height - strokeWidth / 2f),
+                                                                strokeWidth = strokeWidth
+                                                            )
+                                                        }
+                                                    }
+                                                    .padding(horizontal = 14.dp, vertical = 8.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                                horizontalArrangement = Arrangement.SpaceBetween
                                             ) {
-                                                if (isSelected && state.isPlaying) {
-                                                    Text(
-                                                        text = "Playing",
-                                                        color = Color(0xFF388E3C),
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        modifier = Modifier.padding(end = 4.dp)
-                                                    )
-                                                }
+                                                Text(
+                                                    text = "${index + 1}. ${station.name}",
+                                                    color = if (isSelected) purpleAccentColor else primaryTextColor,
+                                                    fontSize = 14.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f)
+                                                )
 
-                                                IconButton(
-                                                    onClick = { viewModel.onMoveStationUp(state.categoryIndex, index) },
-                                                    enabled = index > 0,
-                                                    modifier = Modifier.size(28.dp)
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                                 ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.KeyboardArrowUp,
-                                                        contentDescription = "Move Up",
-                                                        tint = if (index > 0) iconColor else Color.Gray,
-                                                        modifier = Modifier.size(20.dp)
+                                                    if (isSelected && state.isPlaying) {
+                                                        Text(
+                                                            text = "Playing",
+                                                            color = Color(0xFF388E3C),
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            modifier = Modifier.padding(end = 4.dp)
+                                                        )
+                                                    }
+
+                                                    val isStatSkipped = state.skippedStationIds.contains(station.id)
+                                                    ArrowWithRedXIcon(
+                                                        isContinuousNav = !isStatSkipped,
+                                                        onClick = { viewModel.onToggleStationSkipped(station.id) }
                                                     )
                                                 }
+                                            }
+                                        }
+                                    }
 
-                                                IconButton(
-                                                    onClick = { viewModel.onMoveStationDown(state.categoryIndex, index) },
-                                                    enabled = index < totalStationCount - 1,
-                                                    modifier = Modifier.size(28.dp)
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.KeyboardArrowDown,
-                                                        contentDescription = "Move Down",
-                                                        tint = if (index < totalStationCount - 1) iconColor else Color.Gray,
-                                                        modifier = Modifier.size(20.dp)
-                                                    )
-                                                }
+                                    // Top-Level Floating Overlay Card (Rendered OUTSIDE LazyColumn - 100% un-unmountable!)
+                                    val activeDraggedStation = currentCatStations.firstOrNull { it.id == draggedStationId }
+                                    if (draggedStationId != null && activeDraggedStation != null) {
+                                        val density = LocalDensity.current
+                                        val cardOffsetY = with(density) { (currentTouchY - 20.dp.toPx()).roundToInt() }
 
-                                                val isStatSkipped = state.skippedStationIds.contains(station.id)
-                                                ArrowWithRedXIcon(
-                                                    isContinuousNav = !isStatSkipped,
-                                                    onClick = { viewModel.onToggleStationSkipped(station.id) }
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = purpleAccentColor,
+                                            shadowElevation = 8.dp,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 56.dp, end = 14.dp)
+                                                .offset { IntOffset(0, cardOffsetY) }
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(
+                                                    text = "Moving: ${activeDraggedStation.name}",
+                                                    color = Color.White,
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Icon(
+                                                    imageVector = Icons.Default.DragHandle,
+                                                    contentDescription = "Dragging",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(20.dp)
                                                 )
                                             }
                                         }

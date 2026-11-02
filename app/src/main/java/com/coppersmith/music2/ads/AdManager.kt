@@ -15,7 +15,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 enum class AdReason {
     FIRST_MANUAL_PLAY,
     OPEN_SETTINGS,
+    CATEGORY_CHANGE,
     STATION_CHANGE,
+    SEARCH_SUBMIT,
     RETURN_TO_APP
 }
 
@@ -28,8 +30,8 @@ object AdManager {
     private var applicationStartedAtMs = 0L
     private var lastInterstitialShownAtMs = 0L
 
-    // Minimum interval between interstitial ads (2 minutes)
-    private const val MIN_INTERSTITIAL_INTERVAL_MS = 120_000L
+    // Minimum interval between interstitial ads (1 minute)
+    private const val MIN_INTERSTITIAL_INTERVAL_MS = 60_000L
 
     fun initialize(context: Context) {
         if (!initialized.compareAndSet(false, true)) {
@@ -85,7 +87,7 @@ object AdManager {
         }
 
         val now = SystemClock.elapsedRealtime()
-        val minInterval = if (AdConfig.IS_DEBUG) 5_000L else 120_000L
+        val minInterval = if (AdConfig.IS_DEBUG) 5_000L else MIN_INTERSTITIAL_INTERVAL_MS
 
         if (now - lastInterstitialShownAtMs < minInterval && lastInterstitialShownAtMs != 0L) {
             onDismissed()
