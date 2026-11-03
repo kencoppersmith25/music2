@@ -452,6 +452,14 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
 
         repository.exoPlayer = player
 
+        // Auto-resume playback if state is set to playing (e.g. after background service recreate or dormancy Play request)
+        if (repository.state.value.isPlaying) {
+            repository.state.value.currentStation?.let { station ->
+                RideLogger.log("SERVICE_ON_CREATE: Auto-resuming saved station '${station.name}' after service initialization")
+                repository.ensurePlaying(station)
+            }
+        }
+
         // 3. Listener for player states, metadata, ICY metadata, and error recovery
         player.addListener(object : Player.Listener {
             override fun onMetadata(metadata: Metadata) {

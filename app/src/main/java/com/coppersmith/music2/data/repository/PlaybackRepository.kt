@@ -3,6 +3,7 @@
 package com.coppersmith.music2.data.repository
 
 import android.content.Context
+import android.content.Intent
 import androidx.media3.cast.CastPlayer
 import androidx.media3.cast.SessionAvailabilityListener
 import androidx.media3.common.MediaItem
@@ -304,10 +305,10 @@ object PlaybackRepository {
 
     private fun startStartupWatchdog(station: Station) {
         cancelStartupWatchdog()
-        val timeoutMs = 3500L
+        val timeoutMs = (_state.value.stationTimeoutSeconds * 1000L).coerceAtLeast(3000L)
         startupWatchdogJob = scope.launch(Dispatchers.IO) {
             delay(timeoutMs)
-            if (!_state.value.isPlaying) {
+            if (exoPlayer?.isPlaying != true && _state.value.isPlaying) {
                 RideLogger.log("STATION_STARTUP_TIMEOUT station='${station.name}' url='${station.streamUrl}' timeoutMs=$timeoutMs -> Auto-advancing")
                 withContext(Dispatchers.Main) {
                     nextStation()
@@ -371,44 +372,100 @@ object PlaybackRepository {
         savePlaylistToDisk(appContext)
     }
 
+    fun ensurePlaying(targetStation: Station? = _state.value.currentStation) {
+        val station = targetStation ?: run {
+            if (playlist.isNotEmpty()) {
+                commitState(0, 0, autoPlay = true)
+            }
+            return
+        }
+
+        // 1. Ensure Foreground Service is active
+        appContext?.let { ctx ->
+            try {
+                val serviceIntent = Intent(ctx, com.coppersmith.music2.service.MusicPlaybackService::class.java)
+                androidx.core.content.ContextCompat.startForegroundService(ctx, serviceIntent)
+            } catch (e: Exception) {
+                RideLogger.log("ENSURE_PLAYING_SERVICE_START_ERROR: ${e.message}")
+            }
+        }
+
+        val session = activeCastSession
+        if (session != null && session.isConnected) {
+            playOnCastSession(session, station)
+            _state.update { it.copy(isPlaying = true) }
+            return
+        }
+
+        // 2. Prepare & Play ExoPlayer with fresh HTTP socket
+        exoPlayer?.let { player ->
+            RideLogger.log("ENSURE_PLAYING: Re-preparing fresh HTTP connection for station '${station.name}' (streamUrl='${station.streamUrl}')")
+            val metadata = MediaMetadata.Builder()
+                .setTitle(station.name)
+                .setArtist(_state.value.artistName ?: "Live Radio Stream")
+                .setAlbumTitle(_state.value.currentCategory?.name ?: "")
+                .setDisplayTitle(station.name)
+                .setSubtitle(_state.value.artistName ?: "Live Radio Stream")
+                .build()
+
+            val mediaItem = MediaItem.Builder()
+                .setUri(station.streamUrl)
+                .setMediaMetadata(metadata)
+                .build()
+
+            player.setMediaItem(mediaItem)
+            player.seekToDefaultPosition()
+            player.prepare()
+            player.playWhenReady = true
+            player.play()
+
+            startStartupWatchdog(station)
+            _state.update { it.copy(isPlaying = true) }
+        } ?: run {
+            RideLogger.log("ENSURE_PLAYING: ExoPlayer was null. Invoking commitState to initialize playback when service binds.")
+            _state.update { it.copy(isPlaying = true) }
+            commitState(_state.value.categoryIndex.coerceAtLeast(0), _state.value.stationIndex.coerceAtLeast(0), autoPlay = true)
+        }
+    }
+
     suspend fun togglePlayPause() = mutex.withLock {
         val currentState = _state.value
-        if (currentState.currentStation == null && playlist.isNotEmpty()) {
-            commitState(0, 0)
-        } else {
-            val willPlay = !currentState.isPlaying
-            val session = activeCastSession
-            if (session != null && session.isConnected) {
-                val remoteMediaClient = session.remoteMediaClient
-                if (remoteMediaClient != null) {
-                    if (willPlay) {
-                        if (remoteMediaClient.isPaused) {
-                            remoteMediaClient.play()
-                        } else {
-                            currentState.currentStation?.let { playOnCastSession(session, it) }
-                        }
-                    } else {
-                        remoteMediaClient.pause()
-                    }
-                }
-            } else {
-                if (willPlay) {
-                    currentState.currentStation?.let { startStartupWatchdog(it) }
-                    exoPlayer?.let { player ->
-                        // Re-prepare ExoPlayer on live stream resume to ensure fresh AudioTrack handle after background dormancy
-                        currentState.currentStation?.let { station ->
-                            val mediaItem = MediaItem.fromUri(station.streamUrl)
-                            player.setMediaItem(mediaItem)
-                        }
-                        player.seekToDefaultPosition()
-                        player.prepare()
-                        player.play()
-                    }
+        val station = currentState.currentStation
+
+        if (station == null && playlist.isNotEmpty()) {
+            commitState(0, 0, autoPlay = true)
+            return@withLock
+        }
+
+        val session = activeCastSession
+        if (session != null && session.isConnected) {
+            val remoteMediaClient = session.remoteMediaClient
+            if (remoteMediaClient != null) {
+                if (remoteMediaClient.isPlaying) {
+                    remoteMediaClient.pause()
+                    _state.update { it.copy(isPlaying = false) }
                 } else {
-                    exoPlayer?.pause()
+                    station?.let { playOnCastSession(session, it) }
+                    _state.update { it.copy(isPlaying = true) }
                 }
             }
-            _state.update { it.copy(isPlaying = willPlay) }
+            return@withLock
+        }
+
+        // Check if ExoPlayer is currently actually producing audio
+        val isActuallyPlaying = exoPlayer?.isPlaying == true
+
+        if (isActuallyPlaying) {
+            // User explicitly requested Pause/Stop while audio was playing
+            exoPlayer?.pause()
+            _state.update { it.copy(isPlaying = false) }
+            cancelStartupWatchdog()
+            RideLogger.log("PLAY_PAUSE_TOGGLED: Paused active playback by user request")
+        } else {
+            // User wants to PLAY (or stream was dead/paused/idle/dormant)
+            // Force fresh playback setup & start foreground service if needed
+            RideLogger.log("PLAY_PAUSE_TOGGLED: User requested playback start or recovery after dormancy (station='${station?.name}')")
+            ensurePlaying(station)
         }
     }
 
