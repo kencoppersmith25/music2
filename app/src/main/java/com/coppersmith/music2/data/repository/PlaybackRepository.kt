@@ -48,6 +48,12 @@ object PlaybackRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val playlist = mutableListOf<Category>()
 
+    private var lastCategoryActionTime = 0L
+    private const val ACTION_DEBOUNCE_MS = 600L
+
+    private var lastStationActionTime = 0L
+    private const val STATION_ACTION_DEBOUNCE_MS = 350L
+
     // Expose categories cleanly from the data source
     val predefinedCategories = HardcodedDataSource.predefinedCategories
 
@@ -388,6 +394,16 @@ object PlaybackRepository {
             } else {
                 if (willPlay) {
                     currentState.currentStation?.let { startStartupWatchdog(it) }
+                    exoPlayer?.let { player ->
+                        // Re-prepare ExoPlayer on live stream resume to ensure fresh AudioTrack handle after background dormancy
+                        currentState.currentStation?.let { station ->
+                            val mediaItem = MediaItem.fromUri(station.streamUrl)
+                            player.setMediaItem(mediaItem)
+                        }
+                        player.seekToDefaultPosition()
+                        player.prepare()
+                        player.play()
+                    }
                 } else {
                     exoPlayer?.pause()
                 }
@@ -436,17 +452,34 @@ object PlaybackRepository {
         return results
     }
 
-    suspend fun loadCategoryLive(categoryId: String, categoryName: String, tag: String) = mutex.withLock {
-        val displayName = if (categoryName.startsWith("Search:", ignoreCase = true)) categoryName else "Search: ${categoryName.replaceFirstChar { it.uppercase() }}"
-        val searchCatId = "cat_search_${tag.lowercase().replace(" ", "_")}"
+    private var activeSearchJob: Job? = null
 
+    suspend fun loadCategoryLive(categoryId: String, categoryName: String, tag: String) {
         val cleanSearchTerm = categoryName.substringAfter("Search: ").trim().replaceFirstChar { it.uppercase() }
-        RideLogger.log("SEARCH_STARTED query='$tag' term='$cleanSearchTerm'")
-        setLoading(true)
-        _state.update { it.copy(searchingCategoryName = cleanSearchTerm, searchError = null) }
-        val stations = mutableListOf<Station>()
-        try {
-            withContext(Dispatchers.IO) {
+        val displayName = if (categoryName.startsWith("Search:", ignoreCase = true)) categoryName else "Search: $cleanSearchTerm"
+
+        // Instant Zero-Latency Check: If category already exists in playlist, switch to it immediately!
+        val existingIndex = playlist.indexOfFirst {
+            it.name.equals(cleanSearchTerm, ignoreCase = true) ||
+            it.name.equals(displayName, ignoreCase = true) ||
+            it.id == categoryId ||
+            it.id == "cat_search_${tag.lowercase().replace(" ", "_")}"
+        }
+        if (existingIndex != -1) {
+            RideLogger.log("CATEGORY_ALREADY_LOADED category='$displayName' index=$existingIndex -> Switching immediately")
+            selectCategory(existingIndex)
+            return
+        }
+
+        // Cancel previous search job if active so rapid consecutive taps don't queue up redundant searches
+        activeSearchJob?.cancel()
+        activeSearchJob = scope.launch(Dispatchers.IO) {
+            val searchCatId = "cat_search_${tag.lowercase().replace(" ", "_")}"
+            RideLogger.log("SEARCH_STARTED query='$tag' term='$cleanSearchTerm'")
+            setLoading(true)
+            _state.update { it.copy(searchingCategoryName = cleanSearchTerm, searchError = null) }
+            val stations = mutableListOf<Station>()
+            try {
                 val baseUrls = listOf(
                     "https://de1.api.radio-browser.info",
                     "https://all.api.radio-browser.info",
@@ -551,45 +584,46 @@ object PlaybackRepository {
                     .take(searchLimit)
 
                 stations.addAll(combined)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                e.printStackTrace()
+                RideLogger.log("SEARCH_EXCEPTION query='$tag' error='${e.message}'")
+            } finally {
+                setLoading(false)
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            RideLogger.log("SEARCH_EXCEPTION query='$tag' error='${e.message}'")
-        } finally {
-            setLoading(false)
-        }
 
-        if (stations.isNotEmpty()) {
-            RideLogger.log("SEARCH_SUCCESS category='$displayName' stationsCount=${stations.size}")
-            val newCategory = Category(id = searchCatId, name = displayName, stations = stations)
-            withContext(Dispatchers.Main) {
-                val checkIndex = playlist.indexOfFirst {
-                    it.id == searchCatId || it.name.equals(displayName, ignoreCase = true)
-                }
-                val catIdx = if (checkIndex != -1) {
-                    playlist[checkIndex] = newCategory
-                    checkIndex
-                } else {
-                    playlist.add(newCategory)
-                    playlist.size - 1
-                }
+            if (stations.isNotEmpty()) {
+                RideLogger.log("SEARCH_SUCCESS category='$displayName' stationsCount=${stations.size}")
+                val newCategory = Category(id = searchCatId, name = displayName, stations = stations)
+                withContext(Dispatchers.Main) {
+                    val checkIndex = playlist.indexOfFirst {
+                        it.id == searchCatId || it.name.equals(displayName, ignoreCase = true)
+                    }
+                    val catIdx = if (checkIndex != -1) {
+                        playlist[checkIndex] = newCategory
+                        checkIndex
+                    } else {
+                        playlist.add(newCategory)
+                        playlist.size - 1
+                    }
 
-                _state.update { it.copy(searchingCategoryName = null, searchError = null) }
-                savePlaylistToDisk()
-                commitState(catIdx, 0)
-                exoPlayer?.let { player ->
-                    player.prepare()
-                    player.play()
+                    _state.update { it.copy(searchingCategoryName = null, searchError = null) }
+                    savePlaylistToDisk()
+                    commitState(catIdx, 0)
+                    exoPlayer?.let { player ->
+                        player.prepare()
+                        player.play()
+                    }
                 }
-            }
-        } else {
-            RideLogger.log("SEARCH_NO_RESULTS category='$displayName'")
-            withContext(Dispatchers.Main) {
-                _state.update {
-                    it.copy(
-                        searchingCategoryName = null,
-                        searchError = "No stations found for '${categoryName.replace("Search: ", "")}'"
-                    )
+            } else {
+                RideLogger.log("SEARCH_NO_RESULTS category='$displayName'")
+                withContext(Dispatchers.Main) {
+                    _state.update {
+                        it.copy(
+                            searchingCategoryName = null,
+                            searchError = "No stations found for '${categoryName.replace("Search: ", "")}'"
+                        )
+                    }
                 }
             }
         }
@@ -612,6 +646,13 @@ object PlaybackRepository {
     }
 
     fun nextStation() {
+        val currentTime = android.os.SystemClock.elapsedRealtime()
+        if (currentTime - lastStationActionTime < STATION_ACTION_DEBOUNCE_MS) {
+            RideLogger.log("STATION_CHANGE_DEBOUNCED: Discarding rapid pocket/touch burst (${currentTime - lastStationActionTime}ms < ${STATION_ACTION_DEBOUNCE_MS}ms)")
+            return
+        }
+        lastStationActionTime = currentTime
+
         SoundFeedback.playStationChangeTone()
         val currentCat = playlist.getOrNull(_state.value.categoryIndex) ?: return
         if (currentCat.stations.isEmpty()) return
@@ -642,6 +683,13 @@ object PlaybackRepository {
     }
 
     fun previousStation() {
+        val currentTime = android.os.SystemClock.elapsedRealtime()
+        if (currentTime - lastStationActionTime < STATION_ACTION_DEBOUNCE_MS) {
+            RideLogger.log("STATION_CHANGE_DEBOUNCED: Discarding rapid pocket/touch burst (${currentTime - lastStationActionTime}ms < ${STATION_ACTION_DEBOUNCE_MS}ms)")
+            return
+        }
+        lastStationActionTime = currentTime
+
         SoundFeedback.playStationChangeTone()
         val currentCat = playlist.getOrNull(_state.value.categoryIndex) ?: return
         if (currentCat.stations.isEmpty()) return
@@ -926,6 +974,13 @@ object PlaybackRepository {
     }
 
     suspend fun nextCategory() = mutex.withLock {
+        val currentTime = android.os.SystemClock.elapsedRealtime()
+        if (currentTime - lastCategoryActionTime < ACTION_DEBOUNCE_MS) {
+            RideLogger.log("CATEGORY_CHANGE_DEBOUNCED: Discarding rapid pocket/touch burst (${currentTime - lastCategoryActionTime}ms < ${ACTION_DEBOUNCE_MS}ms)")
+            return@withLock
+        }
+        lastCategoryActionTime = currentTime
+
         SoundFeedback.playCategoryChangeTone()
         if (playlist.isEmpty()) return@withLock
         val current = _state.value
@@ -944,6 +999,13 @@ object PlaybackRepository {
     }
 
     suspend fun previousCategory() = mutex.withLock {
+        val currentTime = android.os.SystemClock.elapsedRealtime()
+        if (currentTime - lastCategoryActionTime < ACTION_DEBOUNCE_MS) {
+            RideLogger.log("CATEGORY_CHANGE_DEBOUNCED: Discarding rapid pocket/touch burst (${currentTime - lastCategoryActionTime}ms < ${ACTION_DEBOUNCE_MS}ms)")
+            return@withLock
+        }
+        lastCategoryActionTime = currentTime
+
         SoundFeedback.playCategoryChangeTone()
         if (playlist.isEmpty()) return@withLock
         val current = _state.value
@@ -959,6 +1021,14 @@ object PlaybackRepository {
             }
         }
         commitState(prevCatIdx, null)
+    }
+
+    suspend fun onPreviousCategoryRequested() {
+        previousCategory()
+    }
+
+    suspend fun onNextCategoryRequested() {
+        nextCategory()
     }
 
     suspend fun selectCategory(categoryIndex: Int) = mutex.withLock {

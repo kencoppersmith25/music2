@@ -143,12 +143,18 @@ object RideLogger {
         }
     }
 
+    private var lastLoggedMessage: String? = null
+
     fun log(message: String) {
         android.util.Log.d(TAG, message)
 
         synchronized(lock) {
             val file = logFile ?: return
             if (lineCount >= MAX_LINES) return
+
+            // Suppress consecutive duplicate log entries (e.g. ICY_METADATA repeating every few seconds)
+            if (message == lastLoggedMessage) return
+            lastLoggedMessage = message
 
             val timestamp = timestampFormat.format(Date())
             val line = "$timestamp  ${message.replace('\n', ' ')}\n"

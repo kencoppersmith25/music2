@@ -569,6 +569,8 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                     .build()
             }
 
+            private var lastMediaButtonTime = 0L
+
             override fun onMediaButtonEvent(
                 session: MediaSession,
                 controllerInfo: MediaSession.ControllerInfo,
@@ -577,6 +579,13 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                 @Suppress("DEPRECATION")
                 val keyEvent = intent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
                 if (keyEvent != null && keyEvent.action == KeyEvent.ACTION_DOWN) {
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    if (now - lastMediaButtonTime < 350L) {
+                        RideLogger.log("BLUETOOTH_MEDIA_BUTTON_DEBOUNCED (Ignored rapid bounce) keyCode=${keyEvent.keyCode}")
+                        return true
+                    }
+                    lastMediaButtonTime = now
+
                     RideLogger.log("BLUETOOTH_MEDIA_BUTTON keyCode=${keyEvent.keyCode}")
                     when (keyEvent.keyCode) {
                         KeyEvent.KEYCODE_MEDIA_NEXT -> {

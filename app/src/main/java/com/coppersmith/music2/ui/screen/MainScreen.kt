@@ -395,7 +395,7 @@ fun MainScreen(viewModel: MusicViewModel) {
 
                     // 2-Row Horizontally Scrollable Category Chips
                     val row1Chips = listOf(
-                        "Classical", "Jazz", "Blues", "50s & 60s", "70s", "80s", "90s",
+                        "Classical", "Jazz", "Blues", "50s", "60s", "70s", "80s", "90s",
                         "Rock", "Pop", "Country", "Soul", "Folk", "Gospel", "Big Band"
                     )
                     val row2Chips = listOf(
@@ -2100,6 +2100,13 @@ fun MainScreen(viewModel: MusicViewModel) {
         // Large Examine Ride Log Dialog
         if (showExamineLogDialog) {
             val logContent = remember { com.coppersmith.music2.diagnostics.RideLogger.readLogText() }
+            val logScrollState = rememberScrollState()
+
+            // Automatically scroll to the BOTTOM (newest log entries) as soon as the dialog opens!
+            LaunchedEffect(showExamineLogDialog, logContent) {
+                logScrollState.scrollTo(logScrollState.maxValue)
+            }
+
             AlertDialog(
                 onDismissRequest = { showExamineLogDialog = false },
                 title = {
@@ -2121,7 +2128,7 @@ fun MainScreen(viewModel: MusicViewModel) {
                             .height(340.dp)
                             .background(if (isLight) Color(0xFFF2F2F7) else Color(0xFF121216), shape = RoundedCornerShape(8.dp))
                             .padding(8.dp)
-                            .verticalScroll(rememberScrollState())
+                            .verticalScroll(logScrollState)
                     ) {
                         Text(
                             text = logContent,

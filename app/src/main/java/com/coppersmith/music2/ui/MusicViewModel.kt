@@ -58,6 +58,14 @@ class MusicViewModel : ViewModel() {
         }
     }
 
+    fun onNextCategoryRequested() {
+        onNextCategoryClicked()
+    }
+
+    fun onPreviousCategoryRequested() {
+        onPreviousCategoryClicked()
+    }
+
     fun onDeleteCategoryClicked(categoryIndex: Int) {
         viewModelScope.launch {
             repository.deleteCategory(categoryIndex)
