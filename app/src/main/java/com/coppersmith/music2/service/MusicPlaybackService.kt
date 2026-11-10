@@ -230,14 +230,15 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                     }
                 }
                 AudioManager.AUDIOFOCUS_GAIN -> {
-                    Log.d("MusicPlaybackService", "AudioFocus gained. Restoring volume to 100% and re-preparing live stream.")
-                    RideLogger.log("AUDIO_FOCUS_GAINED: Focus returned -> Restoring volume to 100% and re-preparing live stream")
+                    Log.d("MusicPlaybackService", "AudioFocus gained. Restoring volume to 100%.")
+                    RideLogger.log("AUDIO_FOCUS_GAINED: Focus returned -> Restoring volume to 100%")
                     player.volume = 1.0f
                     if (pausedForPhoneCall) {
                         pausedForPhoneCall = false
                         serviceScope.launch {
-                            repository.ensurePlaying()
+                            repository.setPlaying(true)
                         }
+                        player.play()
                     }
                 }
             }
