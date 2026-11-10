@@ -309,9 +309,9 @@ object PlaybackRepository {
         val timeoutMs = (_state.value.stationTimeoutSeconds * 1000L).coerceAtLeast(3000L)
         startupWatchdogJob = scope.launch(Dispatchers.IO) {
             delay(timeoutMs)
-            if (exoPlayer?.isPlaying != true && _state.value.isPlaying) {
-                RideLogger.log("STATION_STARTUP_TIMEOUT station='${station.name}' url='${station.streamUrl}' timeoutMs=$timeoutMs -> Auto-advancing")
-                withContext(Dispatchers.Main) {
+            withContext(Dispatchers.Main) {
+                if (exoPlayer?.isPlaying != true && _state.value.isPlaying) {
+                    RideLogger.log("STATION_STARTUP_TIMEOUT station='${station.name}' url='${station.streamUrl}' timeoutMs=$timeoutMs -> Auto-advancing")
                     nextStation()
                 }
             }
@@ -398,36 +398,38 @@ object PlaybackRepository {
             return
         }
 
-        // 2. Prepare & Play ExoPlayer with 100% volume
-        exoPlayer?.let { player ->
-            player.volume = 1.0f
-            if (!player.isPlaying || player.playbackState == Player.STATE_IDLE || player.playbackState == Player.STATE_ENDED) {
-                RideLogger.log("ENSURE_PLAYING: Re-preparing stream for station '${station.name}' (streamUrl='${station.streamUrl}')")
-                val metadata = MediaMetadata.Builder()
-                    .setTitle(station.name)
-                    .setArtist(_state.value.artistName ?: "Live Radio Stream")
-                    .setAlbumTitle(_state.value.currentCategory?.name ?: "")
-                    .setDisplayTitle(station.name)
-                    .setSubtitle(_state.value.artistName ?: "Live Radio Stream")
-                    .build()
+        // 2. Prepare & Play ExoPlayer on Main thread
+        scope.launch(Dispatchers.Main) {
+            exoPlayer?.let { player ->
+                player.volume = 1.0f
+                if (!player.isPlaying || player.playbackState == Player.STATE_IDLE || player.playbackState == Player.STATE_ENDED) {
+                    RideLogger.log("ENSURE_PLAYING: Re-preparing stream for station '${station.name}' (streamUrl='${station.streamUrl}')")
+                    val metadata = MediaMetadata.Builder()
+                        .setTitle(station.name)
+                        .setArtist(_state.value.artistName ?: "Live Radio Stream")
+                        .setAlbumTitle(_state.value.currentCategory?.name ?: "")
+                        .setDisplayTitle(station.name)
+                        .setSubtitle(_state.value.artistName ?: "Live Radio Stream")
+                        .build()
 
-                val mediaItem = MediaItem.Builder()
-                    .setUri(station.streamUrl)
-                    .setMediaMetadata(metadata)
-                    .build()
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(station.streamUrl)
+                        .setMediaMetadata(metadata)
+                        .build()
 
-                player.setMediaItem(mediaItem)
-                player.seekToDefaultPosition()
-                player.prepare()
-                player.playWhenReady = true
-                player.play()
+                    player.setMediaItem(mediaItem)
+                    player.seekToDefaultPosition()
+                    player.prepare()
+                    player.playWhenReady = true
+                    player.play()
+                }
+                _state.update { it.copy(isPlaying = true) }
+                startStartupWatchdog(station)
+            } ?: run {
+                RideLogger.log("ENSURE_PLAYING: ExoPlayer was null. Invoking commitState to initialize playback when service binds.")
+                _state.update { it.copy(isPlaying = true) }
+                commitState(_state.value.categoryIndex.coerceAtLeast(0), _state.value.stationIndex.coerceAtLeast(0), autoPlay = true)
             }
-            _state.update { it.copy(isPlaying = true) }
-            startStartupWatchdog(station)
-        } ?: run {
-            RideLogger.log("ENSURE_PLAYING: ExoPlayer was null. Invoking commitState to initialize playback when service binds.")
-            _state.update { it.copy(isPlaying = true) }
-            commitState(_state.value.categoryIndex.coerceAtLeast(0), _state.value.stationIndex.coerceAtLeast(0), autoPlay = true)
         }
     }
 
@@ -455,20 +457,18 @@ object PlaybackRepository {
             return@withLock
         }
 
-        // Check if ExoPlayer is currently actually producing audio
-        val isActuallyPlaying = exoPlayer?.isPlaying == true
+        withContext(Dispatchers.Main) {
+            val isActuallyPlaying = exoPlayer?.isPlaying == true
 
-        if (isActuallyPlaying) {
-            // User explicitly requested Pause/Stop while audio was playing
-            exoPlayer?.pause()
-            _state.update { it.copy(isPlaying = false) }
-            cancelStartupWatchdog()
-            RideLogger.log("PLAY_PAUSE_TOGGLED: Paused active playback by user request")
-        } else {
-            // User wants to PLAY (or stream was dead/paused/idle/dormant)
-            // Force fresh playback setup & start foreground service if needed
-            RideLogger.log("PLAY_PAUSE_TOGGLED: User requested playback start or recovery after dormancy (station='${station?.name}')")
-            ensurePlaying(station)
+            if (isActuallyPlaying || currentState.isPlaying) {
+                exoPlayer?.pause()
+                _state.update { it.copy(isPlaying = false) }
+                cancelStartupWatchdog()
+                RideLogger.log("PLAY_PAUSE_TOGGLED: Paused active playback by user request")
+            } else {
+                RideLogger.log("PLAY_PAUSE_TOGGLED: Starting playback for station '${station?.name}'")
+                ensurePlaying(station)
+            }
         }
     }
 
