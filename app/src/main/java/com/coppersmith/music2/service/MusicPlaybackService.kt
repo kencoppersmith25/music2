@@ -219,10 +219,10 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                     Log.d("MusicPlaybackService", "AudioFocus lost ($focusChange). Muting volume to 0% and pausing player.")
-                    RideLogger.log("AUDIO_FOCUS_LOST ($focusChange): Phone call or interruption -> Muting to 0% and pausing playback")
+                    RideLogger.log("AUDIO_FOCUS_LOST ($focusChange): Interruption (e.g. YouTube/phone call) -> Muting to 0% and pausing playback")
                     player.volume = 0.0f
+                    pausedForPhoneCall = true
                     if (player.isPlaying) {
-                        pausedForPhoneCall = true
                         serviceScope.launch {
                             repository.setPlaying(false)
                         }
@@ -231,16 +231,13 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                 }
                 AudioManager.AUDIOFOCUS_GAIN -> {
                     Log.d("MusicPlaybackService", "AudioFocus gained. Restoring volume to 100% and re-preparing live stream.")
-                    RideLogger.log("AUDIO_FOCUS_GAINED: Phone call ended -> Restoring volume to 100% and re-preparing live stream")
+                    RideLogger.log("AUDIO_FOCUS_GAINED: Focus returned -> Restoring volume to 100% and re-preparing live stream")
                     player.volume = 1.0f
                     if (pausedForPhoneCall) {
                         pausedForPhoneCall = false
                         serviceScope.launch {
-                            repository.setPlaying(true)
+                            repository.ensurePlaying()
                         }
-                        player.seekToDefaultPosition()
-                        player.prepare()
-                        player.play()
                     }
                 }
             }

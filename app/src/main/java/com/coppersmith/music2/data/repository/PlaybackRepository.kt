@@ -380,11 +380,28 @@ object PlaybackRepository {
             return
         }
 
-        // 1. Ensure Foreground Service is active
+        // 1. Ensure Foreground Service is active & request Audio Focus
         appContext?.let { ctx ->
             try {
                 val serviceIntent = Intent(ctx, com.coppersmith.music2.service.MusicPlaybackService::class.java)
                 androidx.core.content.ContextCompat.startForegroundService(ctx, serviceIntent)
+
+                val am = ctx.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+                am?.let { audioMgr ->
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        val attr = android.media.AudioAttributes.Builder()
+                            .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build()
+                        val req = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN)
+                            .setAudioAttributes(attr)
+                            .build()
+                        audioMgr.requestAudioFocus(req)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        audioMgr.requestAudioFocus(null, android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.AUDIOFOCUS_GAIN)
+                    }
+                }
             } catch (e: Exception) {
                 RideLogger.log("ENSURE_PLAYING_SERVICE_START_ERROR: ${e.message}")
             }
@@ -397,9 +414,10 @@ object PlaybackRepository {
             return
         }
 
-        // 2. Prepare & Play ExoPlayer with fresh HTTP socket
+        // 2. Prepare & Play ExoPlayer with 100% volume and fresh HTTP socket
         exoPlayer?.let { player ->
-            RideLogger.log("ENSURE_PLAYING: Re-preparing fresh HTTP connection for station '${station.name}' (streamUrl='${station.streamUrl}')")
+            player.volume = 1.0f
+            RideLogger.log("ENSURE_PLAYING: Restored volume=1.0 & re-preparing fresh HTTP connection for station '${station.name}' (streamUrl='${station.streamUrl}')")
             val metadata = MediaMetadata.Builder()
                 .setTitle(station.name)
                 .setArtist(_state.value.artistName ?: "Live Radio Stream")
