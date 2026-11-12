@@ -286,13 +286,42 @@ object PlaybackRepository {
         _state.update { it.copy(whilePlayingTimeoutSeconds = safeSeconds) }
     }
 
+    private var whilePlayingWatchdogJob: Job? = null
+
+    private fun cancelWhilePlayingWatchdog() {
+        whilePlayingWatchdogJob?.cancel()
+        whilePlayingWatchdogJob = null
+    }
+
     fun setLoading(loading: Boolean) {
         _state.update { it.copy(isLoading = loading) }
+        if (loading && _state.value.isPlaying) {
+            startWhilePlayingWatchdog()
+        } else if (!loading) {
+            cancelWhilePlayingWatchdog()
+        }
+    }
+
+    private fun startWhilePlayingWatchdog() {
+        cancelWhilePlayingWatchdog()
+        val station = _state.value.currentStation ?: return
+        val timeoutMs = (_state.value.whilePlayingTimeoutSeconds * 1000L).coerceAtLeast(2000L)
+        whilePlayingWatchdogJob = scope.launch(Dispatchers.IO) {
+            delay(timeoutMs)
+            withContext(Dispatchers.Main) {
+                if (exoPlayer?.isPlaying != true && _state.value.isPlaying && _state.value.isLoading) {
+                    RideLogger.log("WHILE_PLAYING_DROPOUT_TIMEOUT station='${station.name}' url='${station.streamUrl}' timeoutMs=$timeoutMs -> Auto-advancing")
+                    nextStation()
+                }
+            }
+        }
     }
 
     fun setPlaying(playing: Boolean) {
         if (playing) {
             cancelStartupWatchdog()
+        } else {
+            cancelWhilePlayingWatchdog()
         }
         if (!_state.value.isCasting) {
             _state.update { it.copy(isPlaying = playing) }
