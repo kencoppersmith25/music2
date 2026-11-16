@@ -219,14 +219,16 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                     Log.d("MusicPlaybackService", "AudioFocus lost ($focusChange). Muting volume to 0% and pausing player.")
-                    RideLogger.log("AUDIO_FOCUS_LOST ($focusChange): Interruption (e.g. YouTube/phone call) -> Muting to 0% and pausing playback")
+                    RideLogger.log("AUDIO_FOCUS_LOST ($focusChange): Interruption -> Muting to 0% and pausing playback")
                     player.volume = 0.0f
-                    pausedForPhoneCall = true
-                    if (player.isPlaying) {
+                    if (player.isPlaying || repository.state.value.isPlaying) {
+                        pausedForPhoneCall = true
                         serviceScope.launch {
                             repository.setPlaying(false)
                         }
                         player.pause()
+                    } else {
+                        pausedForPhoneCall = false
                     }
                 }
                 AudioManager.AUDIOFOCUS_GAIN -> {
@@ -708,13 +710,29 @@ class MusicPlaybackService : MediaSessionService(), TextToSpeech.OnInitListener 
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         Log.d("MusicPlaybackService", "App swiped away from recent tasks. Stopping playback.")
-        RideLogger.log("SERVICE_TASK_REMOVED: User swiped app away from recent tasks.")
+        RideLogger.log("SERVICE_TASK_REMOVED: User swiped app away or tapped Close All Apps.")
         releaseWakeLock()
-        serviceScope.launch {
-            repository.setPlaying(false)
+        releaseMulticastLock()
+
+        repository.setPlaying(false)
+
+        if (::player.isInitialized) {
+            player.stop()
+            player.clearMediaItems()
         }
-        player.stop()
-        player.clearMediaItems()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
+
+        mediaSession?.run {
+            release()
+            mediaSession = null
+        }
+
         stopSelf()
         super.onTaskRemoved(rootIntent)
     }
